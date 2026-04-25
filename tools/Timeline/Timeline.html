@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interactive Timeline</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #0a0a1a;
+    color: #e0e0e0;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  .app-container {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 320px;
+    background: linear-gradient(180deg, #12122a 0%, #1a1a3e 100%);
+    border-right: 1px solid rgba(255,255,255,0.06);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    z-index: 10;
+    overflow-y: auto;
+  }
+
+  .sidebar h1 {
+    font-size: 22px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #6ee7b7, #3b82f6, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.5px;
+  }
+
+  .sidebar h1 span {
+    font-weight: 300;
+    font-size: 13px;
+    background: none;
+    -webkit-text-fill-color: #6b7280;
+    margin-top: 4px;
+    letter-spacing: 0;
+  }
+
+  .add-form {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 16px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .add-form h2 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+  }
+
+  .add-form label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #6b7280;
+    margin-bottom: 4px;
+  }
+
+  .add-form input,
+  .add-form textarea,
+  .add-form select {
+    width: 100%;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: #e0e0e0;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    transition: all 0.2s;
+    outline: none;
+  }
+
+  .add-form input:focus,
+  .add-form textarea:focus,
+  .add-form select:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+  }
+
+  .add-form textarea {
+    resize: vertical;
+    min-height: 60px;
+  }
+
+  .add-form select option {
+    background: #1a1a3e;
+    color: #e0e0e0;
+  }
+
+  .color-picker-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .color-dot {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.2s;
+  }
+
+  .color-dot:hover {
+    transform: scale(1.2);
+  }
+
+  .color-dot.selected {
+    border-color: white;
+    box-shadow: 0 0 10px rgba(255,255,255,0.3);
+  }
+
+  .btn-add {
+    background: linear-gradient(135deg, #3b82f6, #6366f1);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 12px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    letter-spacing: 0.3px;
+  }
+
+  .btn-add:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(59,130,246,0.4);
+  }
+
+  .btn-add:active {
+    transform: translateY(0);
+  }
+
+  .event-count {
+    font-size: 12px;
+    color: #4b5563;
+    text-align: center;
+    padding: 8px;
+  }
+
+  /* Timeline Area */
+  .timeline-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .timeline-scroll-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+    position: relative;
+    padding: 0 80px;
+  }
+
+  .timeline-scroll-container::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .timeline-scroll-container::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .timeline-scroll-container::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.1);
+    border-radius: 3px;
+  }
+
+  .timeline-scroll-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.2);
+  }
+
+  /* Fade masks */
+  .fade-mask-top,
+  .fade-mask-bottom {
+    position: sticky;
+    left: 0;
+    right: 0;
+    height: 120px;
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  .fade-mask-top {
+    top: 0;
+    background: linear-gradient(to bottom, #0a0a1a 0%, transparent 100%);
+  }
+
+  .fade-mask-bottom {
+    bottom: 0;
+    background: linear-gradient(to top, #0a0a1a 0%, transparent 100%);
+  }
+
+  /* Timeline */
+  .timeline-line {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(
+      to bottom,
+      transparent 0%,
+      rgba(99,102,241,0.3) 3%,
+      rgba(99,102,241,0.3) 97%,
+      transparent 100%
+    );
+    transform: translateX(-50%);
+    z-index: 1;
+  }
+
+  .timeline-line::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 6px;
+    height: 100%;
+    transform: translateX(-50%);
+    background: linear-gradient(
+      to bottom,
+      transparent 0%,
+      rgba(99,102,241,0.1) 3%,
+      rgba(99,102,241,0.1) 97%,
+      transparent 100%
+    );
+    filter: blur(4px);
+  }
+
+  .timeline-items {
+    position: relative;
+    padding: 120px 0;
+    min-height: 100%;
+  }
+
+  .timeline-item {
+    position: relative;
+    width: 50%;
+    padding: 0 40px 60px;
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+
+  .timeline-item.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .timeline-item.left {
+    left: 0;
+    text-align: right;
+  }
+
+  .timeline-item.right {
+    left: 50%;
+    text-align: left;
+  }
+
+  /* Node dot — fixed size, no hover scale */
+  .timeline-node {
+    position: absolute;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    z-index: 3;
+    transition: all 0.3s;
+  }
+
+  .timeline-item.left .timeline-node {
+    right: -8px;
+    transform: translateX(50%) translateY(-50%);
+  }
+
+  .timeline-item.right .timeline-node {
+    left: -8px;
+    transform: translateX(-50%) translateY(-50%);
+  }
+
+  /* Glow ring behind node */
+  .timeline-node::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    opacity: 0.3;
+    transition: all 0.3s;
+  }
+
+  .timeline-item:hover .timeline-node::before {
+    inset: -6px;
+    opacity: 0.5;
+  }
+
+  /* Card */
+  .timeline-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 16px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+    /* Reserve space for the hidden actions bar so height never changes */
+    min-height: 110px;
+  }
+
+  .timeline-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    border-radius: 16px 16px 0 0;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .timeline-card:hover {
+    background: rgba(255,255,255,0.06);
+    border-color: rgba(255,255,255,0.12);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+  }
+
+  .timeline-card:hover::before {
+    opacity: 1;
+  }
+
+  .timeline-card .card-date {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 6px;
+  }
+
+  .timeline-card .card-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: #f0f0f0;
+  }
+
+  .timeline-card .card-desc {
+    font-size: 13px;
+    color: #6b7280;
+    line-height: 1.6;
+  }
+
+  .timeline-card .card-category {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-top: 10px;
+  }
+
+  /* Actions bar — always in the DOM, just hidden by opacity */
+  .timeline-card .card-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.25s ease, visibility 0.25s ease;
+  }
+
+  .timeline-card:hover .card-actions {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .timeline-item.left .card-actions {
+    justify-content: flex-end;
+  }
+
+  .btn-card {
+    padding: 5px 12px;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-edit {
+    background: rgba(59,130,246,0.15);
+    color: #60a5fa;
+  }
+
+  .btn-edit:hover {
+    background: rgba(59,130,246,0.3);
+  }
+
+  .btn-delete {
+    background: rgba(239,68,68,0.15);
+    color: #f87171;
+  }
+
+  .btn-delete:hover {
+    background: rgba(239,68,68,0.3);
+  }
+
+  /* Edit Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(8px);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s;
+  }
+
+  .modal-overlay.active {
+    display: flex;
+  }
+
+  .modal {
+    background: #16163a;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    padding: 32px;
+    width: 420px;
+    max-width: 90vw;
+    animation: slideUp 0.3s ease;
+  }
+
+  .modal h2 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    background: linear-gradient(135deg, #6ee7b7, #3b82f6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .modal .form-group {
+    margin-bottom: 16px;
+  }
+
+  .modal .form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: #6b7280;
+    margin-bottom: 6px;
+  }
+
+  .modal .form-group input,
+  .modal .form-group textarea,
+  .modal .form-group select {
+    width: 100%;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: #e0e0e0;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    outline: none;
+    transition: all 0.2s;
+  }
+
+  .modal .form-group input:focus,
+  .modal .form-group textarea:focus,
+  .modal .form-group select:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+  }
+
+  .modal .form-group textarea {
+    resize: vertical;
+    min-height: 70px;
+  }
+
+  .modal .form-group select option {
+    background: #16163a;
+  }
+
+  .modal-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 24px;
+  }
+
+  .modal-buttons button {
+    flex: 1;
+    padding: 11px;
+    border: none;
+    border-radius: 12px;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-save {
+    background: linear-gradient(135deg, #3b82f6, #6366f1);
+    color: white;
+  }
+
+  .btn-save:hover {
+    box-shadow: 0 4px 15px rgba(59,130,246,0.4);
+  }
+
+  .btn-cancel {
+    background: rgba(255,255,255,0.06);
+    color: #9ca3af;
+  }
+
+  .btn-cancel:hover {
+    background: rgba(255,255,255,0.1);
+  }
+
+  /* Empty state */
+  .empty-state {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    padding: 40px;
+  }
+
+  .empty-state.active {
+    display: flex;
+  }
+
+  .empty-state .empty-icon {
+    font-size: 64px;
+    margin-bottom: 20px;
+    opacity: 0.5;
+  }
+
+  .empty-state h3 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #4b5563;
+  }
+
+  .empty-state p {
+    font-size: 14px;
+    color: #374151;
+  }
+
+  /* Animations */
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes itemAppear {
+    from {
+      opacity: 0;
+      transform: translateY(20px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .timeline-item.new-item {
+    animation: itemAppear 0.5s ease forwards;
+  }
+
+  /* Scroll hint */
+  .scroll-hint {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 10px 16px;
+    font-size: 12px;
+    color: #6b7280;
+    z-index: 50;
+    animation: pulse 2s infinite;
+    pointer-events: none;
+    transition: opacity 0.5s;
+  }
+
+  .scroll-hint.hidden {
+    opacity: 0;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .sidebar {
+      width: 260px;
+      padding: 16px;
+    }
+    .timeline-scroll-container {
+      padding: 0 40px;
+    }
+  }
+
+  @media (max-width: 600px) {
+    .app-container {
+      flex-direction: column;
+    }
+    .sidebar {
+      width: 100%;
+      max-height: 200px;
+      overflow-y: auto;
+      border-right: none;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .timeline-scroll-container {
+      padding: 0 30px;
+    }
+    .timeline-line {
+      left: 20px;
+    }
+    .timeline-item {
+      width: 100%;
+      left: 0 !important;
+      padding-left: 50px;
+      padding-right: 20px;
+      text-align: left !important;
+    }
+    .timeline-item.left .timeline-node,
+    .timeline-item.right .timeline-node {
+      left: 12px;
+      right: auto;
+      transform: translateX(-50%);
+    }
+    .timeline-item.left .card-actions,
+    .timeline-item.right .card-actions {
+      justify-content: flex-start;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="app-container">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <h1>
+      Timeline
+      <span>Manage your events</span>
+    </h1>
+
+    <div class="add-form">
+      <h2>➕ Add Event</h2>
+      <div>
+        <label>Date</label>
+        <input type="date" id="eventDate">
+      </div>
+      <div>
+        <label>Title</label>
+        <input type="text" id="eventTitle" placeholder="Event title...">
+      </div>
+      <div>
+        <label>Description</label>
+        <textarea id="eventDesc" placeholder="Describe the event..."></textarea>
+      </div>
+      <div>
+        <label>Category</label>
+        <select id="eventCategory">
+          <option value="milestone">🏔️ Milestone</option>
+          <option value="meeting">🤝 Meeting</option>
+          <option value="personal">🌟 Personal</option>
+          <option value="work">💼 Work</option>
+          <option value="learning">📚 Learning</option>
+          <option value="other">📌 Other</option>
+        </select>
+      </div>
+      <div>
+        <label>Color</label>
+        <div class="color-picker-row" id="colorPicker">
+          <div class="color-dot selected" data-color="#3b82f6" style="background:#3b82f6"></div>
+          <div class="color-dot" data-color="#6366f1" style="background:#6366f1"></div>
+          <div class="color-dot" data-color="#a78bfa" style="background:#a78bfa"></div>
+          <div class="color-dot" data-color="#6ee7b7" style="background:#6ee7b7"></div>
+          <div class="color-dot" data-color="#f472b6" style="background:#f472b6"></div>
+          <div class="color-dot" data-color="#fb923c" style="background:#fb923c"></div>
+          <div class="color-dot" data-color="#facc15" style="background:#facc15"></div>
+          <div class="color-dot" data-color="#f87171" style="background:#f87171"></div>
+        </div>
+      </div>
+      <button class="btn-add" id="btnAdd">Add Event</button>
+    </div>
+
+    <div class="event-count" id="eventCount">0 events</div>
+  </div>
+
+  <!-- Timeline Area -->
+  <div class="timeline-area">
+    <div class="timeline-scroll-container" id="scrollContainer">
+      <div class="fade-mask-top"></div>
+      <div class="fade-mask-bottom"></div>
+      <!-- Timeline line is now INSIDE .timeline-items so it stretches to the full content height -->
+      <div class="timeline-items" id="timelineItems">
+        <div class="timeline-line"></div>
+        <!-- Events rendered here -->
+      </div>
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">📋</div>
+        <h3>No events yet</h3>
+        <p>Add your first event using the sidebar to get started.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <h2>✏️ Edit Event</h2>
+    <div class="form-group">
+      <label>Date</label>
+      <input type="date" id="editDate">
+    </div>
+    <div class="form-group">
+      <label>Title</label>
+      <input type="text" id="editTitle">
+    </div>
+    <div class="form-group">
+      <label>Description</label>
+      <textarea id="editDesc"></textarea>
+    </div>
+    <div class="form-group">
+      <label>Category</label>
+      <select id="editCategory">
+        <option value="milestone">🏔️ Milestone</option>
+        <option value="meeting">🤝 Meeting</option>
+        <option value="personal">🌟 Personal</option>
+        <option value="work">💼 Work</option>
+        <option value="learning">📚 Learning</option>
+        <option value="other">📌 Other</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Color</label>
+      <div class="color-picker-row" id="editColorPicker">
+        <div class="color-dot" data-color="#3b82f6" style="background:#3b82f6"></div>
+        <div class="color-dot" data-color="#6366f1" style="background:#6366f1"></div>
+        <div class="color-dot" data-color="#a78bfa" style="background:#a78bfa"></div>
+        <div class="color-dot" data-color="#6ee7b7" style="background:#6ee7b7"></div>
+        <div class="color-dot" data-color="#f472b6" style="background:#f472b6"></div>
+        <div class="color-dot" data-color="#fb923c" style="background:#fb923c"></div>
+        <div class="color-dot" data-color="#facc15" style="background:#facc15"></div>
+        <div class="color-dot" data-color="#f87171" style="background:#f87171"></div>
+      </div>
+    </div>
+    <div class="modal-buttons">
+      <button class="btn-cancel" id="btnCancelEdit">Cancel</button>
+      <button class="btn-save" id="btnSaveEdit">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Scroll hint -->
+<div class="scroll-hint" id="scrollHint">↕ Scroll to explore</div>
+
+<script>
+  // State
+  let events = [];
+  let editingId = null;
+  let selectedColor = '#3b82f6';
+  let editSelectedColor = '#3b82f6';
+  let idCounter = Date.now();
+
+  // DOM refs
+  const scrollContainer = document.getElementById('scrollContainer');
+  const timelineItems = document.getElementById('timelineItems');
+  const emptyState = document.getElementById('emptyState');
+  const eventCount = document.getElementById('eventCount');
+  const btnAdd = document.getElementById('btnAdd');
+  const editModal = document.getElementById('editModal');
+  const btnCancelEdit = document.getElementById('btnCancelEdit');
+  const btnSaveEdit = document.getElementById('btnSaveEdit');
+  const scrollHint = document.getElementById('scrollHint');
+
+  // Category configs
+  const categoryConfig = {
+    milestone: { emoji: '🏔️', label: 'Milestone', color: '#6ee7b7' },
+    meeting: { emoji: '🤝', label: 'Meeting', color: '#3b82f6' },
+    personal: { emoji: '🌟', label: 'Personal', color: '#f472b6' },
+    work: { emoji: '💼', label: 'Work', color: '#a78bfa' },
+    learning: { emoji: '📚', label: 'Learning', color: '#fb923c' },
+    other: { emoji: '📌', label: 'Other', color: '#6b7280' }
+  };
+
+  // Initialize with sample events
+  function initSampleEvents() {
+    const samples = [
+      { date: '2024-01-15', title: 'Project Kickoff', desc: 'Initial team meeting to define project scope and timeline.', category: 'work', color: '#3b82f6' },
+      { date: '2024-02-20', title: 'First Prototype', desc: 'Completed the first working prototype of the main feature.', category: 'milestone', color: '#6ee7b7' },
+      { date: '2024-03-10', title: 'User Testing', desc: 'Conducted user testing sessions with 15 participants.', category: 'meeting', color: '#a78bfa' },
+      { date: '2024-04-05', title: 'Design Sprint', desc: 'Intensive 3-day design sprint to refine the UI/UX.', category: 'work', color: '#6366f1' },
+      { date: '2024-05-12', title: 'Team Retreat', desc: 'Annual team retreat at the mountain lodge.', category: 'personal', color: '#f472b6' },
+      { date: '2024-06-18', title: 'Beta Launch', desc: 'Launched the beta version to early adopters.', category: 'milestone', color: '#6ee7b7' },
+      { date: '2024-07-22', title: 'Course Completed', desc: 'Finished the advanced React patterns course.', category: 'learning', color: '#fb923c' },
+      { date: '2024-08-30', title: 'Performance Review', desc: 'Mid-year performance review and goal setting.', category: 'work', color: '#3b82f6' },
+      { date: '2024-09-14', title: 'Product Hunt Launch', desc: 'Launched on Product Hunt and got to #1 of the day!', category: 'milestone', color: '#6ee7b7' },
+      { date: '2024-10-01', title: '1000 Users Milestone', desc: 'Reached 1,000 active users on the platform.', category: 'milestone', color: '#facc15' },
+      { date: '2024-11-08', title: 'Hackathon Win', desc: 'Won 1st place at the regional hackathon.', category: 'personal', color: '#f472b6' },
+      { date: '2024-12-20', title: 'Year End Review', desc: 'Annual review and planning for next year.', category: 'meeting', color: '#a78bfa' },
+    ];
+
+    samples.forEach(s => {
+      events.push({
+        id: String(idCounter++),
+        date: s.date,
+        title: s.title,
+        desc: s.desc,
+        category: s.category,
+        color: s.color
+      });
+    });
+
+    saveToStorage();
+  }
+
+  // Storage
+  function saveToStorage() {
+    try {
+      localStorage.setItem('timeline_events', JSON.stringify(events));
+    } catch (e) {
+      console.warn('Failed to save to localStorage:', e);
+    }
+  }
+
+  function loadFromStorage() {
+    try {
+      const data = localStorage.getItem('timeline_events');
+      if (data) {
+        events = JSON.parse(data);
+      }
+    } catch (e) {
+      console.warn('Failed to load from localStorage:', e);
+    }
+  }
+
+  // Format date
+  function formatDate(dateStr) {
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  // Render timeline
+  function renderTimeline() {
+    // Sort events by date
+    events.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    // Preserve the line element
+    const line = timelineItems.querySelector('.timeline-line');
+
+    // Remove all item elements
+    timelineItems.querySelectorAll('.timeline-item').forEach(el => el.remove());
+
+    if (events.length === 0) {
+      emptyState.classList.add('active');
+      eventCount.textContent = '0 events';
+      return;
+    }
+
+    emptyState.classList.remove('active');
+    eventCount.textContent = `${events.length} event${events.length !== 1 ? 's' : ''}`;
+
+    events.forEach((event, index) => {
+      const isLeft = index % 2 === 0;
+      const cat = categoryConfig[event.category] || categoryConfig.other;
+      const item = document.createElement('div');
+      item.className = `timeline-item ${isLeft ? 'left' : 'right'}`;
+      item.dataset.id = event.id;
+
+      item.innerHTML = `
+        <div class="timeline-node" style="background:${event.color}; box-shadow: 0 0 12px ${event.color}40, 0 0 24px ${event.color}20;"></div>
+        <div class="timeline-card">
+          <div class="card-date" style="color:${event.color}">${formatDate(event.date)}</div>
+          <div class="card-title">${escapeHtml(event.title)}</div>
+          <div class="card-desc">${escapeHtml(event.desc)}</div>
+          <span class="card-category" style="background:${event.color}20; color:${event.color}; border: 1px solid ${event.color}30;">
+            ${cat.emoji} ${cat.label}
+          </span>
+          <div class="card-actions">
+            <button class="btn-card btn-edit" onclick="event.stopPropagation(); openEditModal(${event.id})">✏️ Edit</button>
+            <button class="btn-card btn-delete" onclick="event.stopPropagation(); deleteEvent(${event.id})">🗑️ Delete</button>
+          </div>
+        </div>
+      `;
+
+      timelineItems.appendChild(item);
+    });
+
+    // Trigger visibility animations
+    requestAnimationFrame(() => {
+      observeItems();
+    });
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // Intersection Observer for scroll animations
+  function observeItems() {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, {
+      root: scrollContainer,
+      threshold: 0.15,
+      rootMargin: '0px 0px -50px 0px'
+    });
+
+    document.querySelectorAll('.timeline-item:not(.visible)').forEach(item => {
+      observer.observe(item);
+    });
+  }
+
+  // Add event
+  btnAdd.addEventListener('click', () => {
+    const date = document.getElementById('eventDate').value;
+    const title = document.getElementById('eventTitle').value.trim();
+    const desc = document.getElementById('eventDesc').value.trim();
+    const category = document.getElementById('eventCategory').value;
+
+    if (!date || !title) {
+      shakeElement(btnAdd);
+      return;
+    }
+
+    const newEvent = {
+      id: String(idCounter++),
+      date,
+      title,
+      desc: desc || 'No description provided.',
+      category,
+      color: selectedColor
+    };
+
+    events.push(newEvent);
+    saveToStorage();
+
+    // Clear form
+    document.getElementById('eventDate').value = '';
+    document.getElementById('eventTitle').value = '';
+    document.getElementById('eventDesc').value = '';
+
+    renderTimeline();
+
+    // Scroll to the new event
+    setTimeout(() => {
+      const newItem = document.querySelector(`.timeline-item[data-id="${newEvent.id}"]`);
+      if (newItem) {
+        newItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
+  });
+
+  // Color picker
+  document.querySelectorAll('#colorPicker .color-dot').forEach(dot => {
+    dot.addEventListener('click', () => {
+      document.querySelectorAll('#colorPicker .color-dot').forEach(d => d.classList.remove('selected'));
+      dot.classList.add('selected');
+      selectedColor = dot.dataset.color;
+    });
+  });
+
+  document.querySelectorAll('#editColorPicker .color-dot').forEach(dot => {
+    dot.addEventListener('click', () => {
+      document.querySelectorAll('#editColorPicker .color-dot').forEach(d => d.classList.remove('selected'));
+      dot.classList.add('selected');
+      editSelectedColor = dot.dataset.color;
+    });
+  });
+
+  // Edit modal
+  function openEditModal(id) {
+    const event = events.find(e => e.id === id);
+    if (!event) return;
+
+    editingId = id;
+    document.getElementById('editDate').value = event.date;
+    document.getElementById('editTitle').value = event.title;
+    document.getElementById('editDesc').value = event.desc;
+    document.getElementById('editCategory').value = event.category;
+
+    editSelectedColor = event.color;
+    document.querySelectorAll('#editColorPicker .color-dot').forEach(d => {
+      d.classList.toggle('selected', d.dataset.color === event.color);
+    });
+
+    editModal.classList.add('active');
+  }
+
+  function closeEditModal() {
+    editModal.classList.remove('active');
+    editingId = null;
+  }
+
+  btnCancelEdit.addEventListener('click', closeEditModal);
+  editModal.addEventListener('click', (e) => {
+    if (e.target === editModal) closeEditModal();
+  });
+
+  btnSaveEdit.addEventListener('click', () => {
+    if (editingId === null) return;
+
+    const event = events.find(e => e.id === editingId);
+    if (!event) return;
+
+    const date = document.getElementById('editDate').value;
+    const title = document.getElementById('editTitle').value.trim();
+
+    if (!date || !title) return;
+
+    event.date = date;
+    event.title = title;
+    event.desc = document.getElementById('editDesc').value.trim() || 'No description provided.';
+    event.category = document.getElementById('editCategory').value;
+    event.color = editSelectedColor;
+
+    saveToStorage();
+    renderTimeline();
+    closeEditModal();
+  });
+
+  // Delete event
+  function deleteEvent(id) {
+    const item = document.querySelector(`.timeline-item[data-id="${id}"]`);
+    if (item) {
+      item.style.transition = 'all 0.4s ease';
+      item.style.opacity = '0';
+      item.style.transform = 'scale(0.8) translateY(-20px)';
+
+      setTimeout(() => {
+        events = events.filter(e => e.id !== id);
+        saveToStorage();
+        renderTimeline();
+      }, 400);
+    } else {
+      events = events.filter(e => e.id !== id);
+      saveToStorage();
+      renderTimeline();
+    }
+  }
+
+  // Shake animation for validation
+  function shakeElement(el) {
+    el.style.animation = 'none';
+    el.offsetHeight;
+    el.style.animation = 'shake 0.4s ease';
+    setTimeout(() => el.style.animation = '', 400);
+  }
+
+  // Scroll hint
+  let scrollCount = 0;
+  scrollContainer.addEventListener('scroll', () => {
+    scrollCount++;
+    if (scrollCount > 5) {
+      scrollHint.classList.add('hidden');
+    }
+  });
+
+  // Keyboard shortcut
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeEditModal();
+    if (e.key === 'n' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      document.getElementById('eventTitle').focus();
+    }
+  });
+
+  // Initialize
+  loadFromStorage();
+  if (events.length === 0) {
+    initSampleEvents();
+    loadFromStorage();
+  }
+  renderTimeline();
+
+  // Add shake keyframe dynamically
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-6px); }
+      40% { transform: translateX(6px); }
+      60% { transform: translateX(-4px); }
+      80% { transform: translateX(4px); }
+    }
+  `;
+  document.head.appendChild(style);
+</script>
+
+</body>
+</html>
+

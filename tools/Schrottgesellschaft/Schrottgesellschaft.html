@@ -1,0 +1,962 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Charakterbogen — Leer</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f14;
+    --panel: #12151c;
+    --panel2: #161a24;
+    --border: #2a3045;
+    --accent: #e8a020;
+    --accent2: #c75c2a;
+    --red: #c0392b;
+    --green: #27ae60;
+    --blue: #2980b9;
+    --text: #d4cfc7;
+    --text-dim: #6b7080;
+    --text-bright: #f0ebe3;
+    --purple: #7d3c98;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 15px;
+    min-height: 100vh;
+    padding: 24px 24px 80px;
+    background-image:
+      radial-gradient(ellipse 80% 40% at 50% -10%, rgba(232,160,32,0.07) 0%, transparent 70%),
+      repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(42,48,69,0.3) 39px, rgba(42,48,69,0.3) 40px),
+      repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(42,48,69,0.15) 39px, rgba(42,48,69,0.15) 40px);
+  }
+
+  [contenteditable="true"] { outline: none; border-radius: 2px; transition: background 0.15s; cursor: text; }
+  [contenteditable="true"]:hover { background: rgba(232,160,32,0.07); }
+  [contenteditable="true"]:focus { background: rgba(232,160,32,0.12); box-shadow: inset 0 0 0 1px rgba(232,160,32,0.35); }
+
+  .edit-hint {
+    position: fixed; bottom: 18px; right: 18px;
+    font-family: 'Share Tech Mono', monospace; font-size: 10px; letter-spacing: 2px;
+    color: var(--text-dim); background: var(--panel); border: 1px solid var(--border);
+    padding: 6px 12px; pointer-events: none; opacity: 0.7; z-index: 99;
+  }
+  .save-btn {
+    position: fixed; bottom: 18px; left: 18px;
+    font-family: 'Bebas Neue', sans-serif; font-size: 16px; letter-spacing: 3px;
+    color: var(--bg); background: var(--accent); border: none; padding: 8px 20px;
+    cursor: pointer; clip-path: polygon(6px 0%,100% 0%,calc(100% - 6px) 100%,0% 100%);
+    transition: background 0.15s, transform 0.1s; z-index: 100;
+  }
+  .save-btn:hover { background: #f0b030; transform: scale(1.03); }
+  .save-btn.ok { background: var(--green); }
+  .util-btns {
+    position: fixed; bottom: 18px; left: 160px;
+    display: flex; gap: 8px; z-index: 100;
+  }
+  .util-btn {
+    font-family: 'Bebas Neue', sans-serif; font-size: 14px; letter-spacing: 2px;
+    color: var(--text-dim); background: var(--panel); border: 1px solid var(--border);
+    padding: 8px 14px; cursor: pointer;
+    clip-path: polygon(5px 0%,100% 0%,calc(100% - 5px) 100%,0% 100%);
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+  .util-btn:hover { color: var(--accent); border-color: var(--accent); background: rgba(232,160,32,0.08); }
+  .util-btn.danger:hover { color: var(--red); border-color: var(--red); background: rgba(192,57,43,0.08); }
+
+  .sheet {
+    max-width: 1100px; margin: 0 auto;
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px;
+  }
+
+  /* HEADER */
+  .header {
+    grid-column: 1/-1; display: flex; align-items: center;
+    justify-content: space-between; border-bottom: 2px solid var(--accent);
+    padding-bottom: 14px; margin-bottom: 4px; position: relative;
+  }
+  .header::after {
+    content:''; position: absolute; bottom: -6px; left: 0; right: 0;
+    height: 1px; background: linear-gradient(90deg,transparent,var(--accent2),transparent);
+  }
+  .header-left h1 {
+    font-family: 'Bebas Neue', sans-serif; font-size: 52px; letter-spacing: 6px;
+    color: var(--accent); line-height: 1; text-shadow: 0 0 40px rgba(232,160,32,0.4);
+    animation: flicker 8s infinite; min-width: 40px; display: block;
+  }
+  .header-left .subtitle {
+    font-family: 'Share Tech Mono', monospace; font-size: 11px; letter-spacing: 4px;
+    color: var(--text-dim); margin-top: 2px; display: block;
+  }
+  .class-badge {
+    background: linear-gradient(135deg,var(--accent2),#a04010);
+    padding: 8px 22px; font-family: 'Bebas Neue', sans-serif; font-size: 28px;
+    letter-spacing: 4px; color: #fff;
+    clip-path: polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);
+    box-shadow: 0 4px 20px rgba(199,92,42,0.4); min-width: 40px; text-align: center;
+  }
+
+  /* PANEL */
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 2px; padding: 16px; position: relative; overflow: hidden;
+  }
+  .panel::before {
+    content:''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg,var(--accent),transparent);
+  }
+  .panel.red::before  { background: linear-gradient(90deg,var(--red),transparent); }
+  .panel.blue::before { background: linear-gradient(90deg,var(--blue),transparent); }
+  .panel-title {
+    font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 3px;
+    color: var(--accent); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+  }
+  .panel-title::after { content:''; flex:1; height:1px; background:var(--border); }
+  .panel.red  .panel-title { color: var(--red); }
+  .panel.blue .panel-title { color: var(--blue); }
+
+  /* VITALS */
+  .vitals-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .vital-box {
+    background: var(--panel2); border: 1px solid var(--border);
+    padding: 12px; text-align: center;
+  }
+  .v-num {
+    font-family: 'Bebas Neue', sans-serif; font-size: 46px; line-height: 1;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+  }
+  .v-num.red   { color: var(--red);   text-shadow: 0 0 20px rgba(192,57,43,0.5); }
+  .v-num.amber { color: var(--accent); text-shadow: 0 0 20px rgba(232,160,32,0.4); }
+  .v-num.blue  { color: var(--blue);  text-shadow: 0 0 20px rgba(41,128,185,0.4); }
+  .v-num.green { color: var(--green); text-shadow: 0 0 20px rgba(39,174,96,0.4); }
+  .v-label { font-family:'Bebas Neue',sans-serif; font-size:13px; letter-spacing:2px; color:var(--text-dim); margin-top:2px; }
+  .v-detail { font-family:'Share Tech Mono',monospace; font-size:10px; color:var(--text-dim); margin-top:4px; }
+
+  /* STEPPER */
+  .sb {
+    font-family: 'Share Tech Mono', monospace; font-size: 14px; color: var(--text-dim);
+    background: none; border: 1px solid var(--border); width: 20px; height: 22px;
+    cursor: pointer; padding: 0; transition: color 0.1s, border-color 0.1s, background 0.1s;
+    flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; line-height: 1;
+  }
+  .sb:hover { color: var(--accent); border-color: var(--accent); background: rgba(232,160,32,0.08); }
+  .sb.sm { width:16px; height:16px; font-size:11px; }
+  .sb.xs { width:13px; height:13px; font-size:10px; }
+
+  /* INITIATIVE */
+  .init-bar {
+    position: relative; height: 42px; background: var(--panel2);
+    border: 1px solid var(--border); overflow: hidden; margin-bottom: 14px;
+  }
+  .init-fill {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    background: linear-gradient(90deg,rgba(232,160,32,0.3),rgba(232,160,32,0.08));
+    border-right: 2px solid var(--accent); transition: width 0.3s;
+  }
+  .init-label {
+    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    font-family:'Bebas Neue',sans-serif; font-size:14px; letter-spacing:3px; color:var(--text-dim); z-index:1;
+  }
+  .init-val {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    font-family:'Bebas Neue',sans-serif; font-size:30px; color:var(--accent);
+    text-shadow: 0 0 20px rgba(232,160,32,0.5); z-index:1;
+    display:flex; align-items:center; gap:4px;
+  }
+  .init-formula { font-family:'Share Tech Mono',monospace; font-size:11px; color:var(--text-dim); margin-bottom:8px; }
+
+  /* CURRENCY */
+  .currency-box { display:flex; gap:10px; margin-top:10px; }
+  .lyka-block { flex:1; background:var(--panel2); border:1px solid var(--border); padding:10px 14px; text-align:center; }
+  .lyka-num {
+    font-family:'Bebas Neue',sans-serif; font-size:34px; color:var(--accent);
+    text-shadow:0 0 20px rgba(232,160,32,0.3); line-height:1;
+    display:flex; align-items:center; justify-content:center; gap:4px;
+  }
+  .lyka-num.orange { color:var(--accent2); text-shadow:0 0 20px rgba(199,92,42,0.4); }
+  .lyka-label { font-size:10px; letter-spacing:2px; color:var(--text-dim); margin-top:2px; }
+
+  /* SKILL TABLE */
+  .skill-table { width:100%; border-collapse:collapse; }
+  .skill-table th { font-family:'Bebas Neue',sans-serif; font-size:13px; letter-spacing:2px; color:var(--text-dim); text-align:left; padding:4px 6px; border-bottom:1px solid var(--border); }
+  .skill-table th.r { text-align:right; }
+  .skill-table td { padding:4px 6px; border-bottom:1px solid rgba(42,48,69,0.3); font-size:13px; }
+  .skill-table tr:last-child td { border-bottom:none; }
+  .attr-td { font-family:'Share Tech Mono',monospace; font-size:11px; color:var(--text-dim); letter-spacing:1px; }
+  .tw-td { text-align:right; font-family:'Share Tech Mono',monospace; font-weight:bold; font-size:15px; white-space:nowrap; }
+  .tw-td .sb { font-size:10px; width:15px; height:15px; }
+  .tw-val { display:inline-block; min-width:26px; text-align:center; }
+  .c0 { color:var(--text-dim); }
+  .cp { color:var(--accent); }
+  .ch { color:var(--green); }
+
+  /* WEAPONS */
+  #weapons-list .weapon-row { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid rgba(42,48,69,0.4); flex-wrap:wrap; }
+  #weapons-list .weapon-row:last-child { border-bottom:none; }
+  .wp-name { flex:2; min-width:100px; color:var(--text-bright); font-size:14px; }
+  .wp-dmg { font-family:'Share Tech Mono',monospace; font-size:13px; color:var(--red); min-width:56px; text-align:center; background:rgba(192,57,43,0.08); border:1px solid rgba(192,57,43,0.2); padding:2px 5px; border-radius:2px; }
+  .wp-counter { display:flex; align-items:center; gap:2px; }
+  .wp-counter-wrap { display:flex; flex-direction:column; align-items:center; gap:1px; }
+  .wp-counter-label { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:1px; color:var(--text-dim); }
+  .wp-counter-val { font-family:'Bebas Neue',sans-serif; font-size:20px; color:var(--accent); min-width:18px; text-align:center; line-height:1; }
+  .wp-rule { flex:2; min-width:80px; font-family:'Share Tech Mono',monospace; font-size:11px; color:var(--text-dim); }
+
+  /* CHARAKTEREIGENSCHAFTEN */
+  .char-prop-row { display:flex; align-items:baseline; gap:8px; padding:6px 0; border-bottom:1px solid rgba(42,48,69,0.3); }
+  .char-prop-row:last-child { border-bottom:none; }
+  .char-prop-label { font-family:'Share Tech Mono',monospace; font-size:10px; letter-spacing:1px; color:var(--text-dim); min-width:110px; flex-shrink:0; }
+  .char-prop-val { font-size:14px; color:var(--text-bright); flex:1; }
+  .char-prop-merkmale { min-height:48px; line-height:1.5; }
+
+  /* INVENTORY */
+  #inventory-list .item-row {
+    display:flex; align-items:flex-start; gap:8px; padding:6px 0;
+    border-bottom:1px solid rgba(42,48,69,0.4);
+  }
+  .iw-wrap { display:flex; flex-direction:column; align-items:center; flex-shrink:0; gap:2px; }
+  .iw-label { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:1px; color:var(--text-dim); }
+  .iw {
+    font-family:'Share Tech Mono',monospace; font-size:13px; color:var(--accent);
+    background:rgba(232,160,32,0.08); border:1px solid rgba(232,160,32,0.2);
+    padding:2px 3px; border-radius:2px; display:flex; align-items:center; justify-content:center; gap:1px;
+    flex-shrink:0;
+  }
+  .iw-v { min-width:16px; text-align:center; }
+  .item-content { flex:1; }
+  .item-name { color:var(--text-bright); font-size:14px; }
+  .item-desc { color:var(--text-dim); font-size:11px; font-family:'Share Tech Mono',monospace; margin-top:1px; }
+  .tag { display:inline-block; font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:1px; padding:1px 5px; border-radius:2px; margin-right:3px; vertical-align:middle; }
+  .tag.d { background:rgba(192,57,43,0.15); color:var(--red); border:1px solid rgba(192,57,43,0.3); }
+  .tag.b { background:rgba(39,174,96,0.12); color:var(--green); border:1px solid rgba(39,174,96,0.3); }
+  .del-btn { background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:13px; padding:0 2px; line-height:1; opacity:0; transition:opacity 0.15s,color 0.15s; align-self:center; }
+  .item-row:hover .del-btn, .weapon-row:hover .del-btn { opacity:1; }
+  .del-btn:hover { color:var(--red); }
+  .add-row-btn {
+    font-family:'Share Tech Mono',monospace; font-size:11px; letter-spacing:2px; color:var(--text-dim);
+    background:none; border:1px dashed var(--border); padding:5px 10px; cursor:pointer; width:100%;
+    margin-top:8px; transition:color 0.15s,border-color 0.15s; text-align:center;
+  }
+  .add-row-btn:hover { color:var(--accent); border-color:var(--accent); }
+
+  /* ADV/DIS */
+  .adv-box { background:var(--panel2); border-left:3px solid var(--green); padding:10px 12px; font-size:13px; line-height:1.6; }
+  .adv-box.dis { border-left-color:var(--red); }
+  .adv-title { font-family:'Bebas Neue',sans-serif; font-size:15px; letter-spacing:2px; color:var(--green); display:block; margin-bottom:5px; }
+  .adv-box.dis .adv-title { color:var(--red); }
+
+  /* ROLLS */
+  .roll-row { display:flex; gap:8px; align-items:center; padding:4px 0; border-bottom:1px solid rgba(42,48,69,0.3); font-size:12px; }
+  .roll-row:last-of-type { border-bottom:none; }
+  .roll-num { font-family:'Bebas Neue',sans-serif; font-size:18px; min-width:30px; text-align:center; }
+  .roll-num.good { color:var(--green); } .roll-num.warn { color:var(--accent); } .roll-num.bad { color:var(--red); }
+  .roll-desc { color:var(--text); flex:1; line-height:1.4; }
+
+  /* ABILITIES */
+  .ability-card { background:var(--panel2); border:1px solid var(--border); padding:12px; }
+  .ability-header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
+  .ab-name { font-family:'Bebas Neue',sans-serif; font-size:17px; letter-spacing:2px; color:var(--accent); }
+  .ab-attr { font-family:'Share Tech Mono',monospace; font-size:11px; color:var(--text-dim); letter-spacing:1px; }
+  .ab-desc { font-size:12px; color:var(--text); line-height:1.55; white-space:pre-line; }
+
+  .full  { grid-column: 1/-1; }
+  .span2 { grid-column: span 2; }
+
+  .v-num.purple { color: var(--purple); text-shadow: 0 0 20px rgba(125,60,152,0.5); }
+  .v-sub { font-family:'Share Tech Mono',monospace; font-size:13px; margin-top:2px; display:flex; align-items:center; justify-content:center; gap:2px; }
+  .v-sub.red    { color: var(--red); }
+  .v-sub.green  { color: var(--green); }
+  .v-sub.blue   { color: var(--blue); }
+  .v-sub.amber  { color: var(--accent); }
+  .v-sub.purple { color: var(--purple); }
+  .attr-row { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:var(--panel2); border:1px solid var(--border); border-radius:2px; margin-bottom:6px; }
+  .attr-row:last-child { margin-bottom:0; }
+  .attr-code { font-family:'Bebas Neue',sans-serif; font-size:20px; letter-spacing:3px; color:var(--text-dim); min-width:40px; }
+  .attr-val { font-family:'Bebas Neue',sans-serif; font-size:32px; min-width:36px; text-align:center; line-height:1; }
+  .attr-val.red    { color: var(--red);    text-shadow: 0 0 16px rgba(192,57,43,0.5); }
+  .attr-val.green  { color: var(--green);  text-shadow: 0 0 16px rgba(39,174,96,0.4); }
+  .attr-val.blue   { color: var(--blue);   text-shadow: 0 0 16px rgba(41,128,185,0.4); }
+  .attr-val.amber  { color: var(--accent); text-shadow: 0 0 16px rgba(232,160,32,0.4); }
+  .attr-val.purple { color: var(--purple); text-shadow: 0 0 16px rgba(125,60,152,0.5); }
+  .notes-area { min-height:120px; font-family:'Share Tech Mono',monospace; font-size:12px; line-height:1.9; color:var(--text); padding:4px 2px; background: repeating-linear-gradient(transparent, transparent 28px, rgba(42,48,69,0.4) 28px, rgba(42,48,69,0.4) 29px); }
+
+  @keyframes flicker {
+    0%,100%{opacity:1} 92%{opacity:1} 93%{opacity:.7} 94%{opacity:1} 96%{opacity:.8} 97%{opacity:1}
+  }
+  @media(max-width:800px){ .sheet{grid-template-columns:1fr 1fr} .span2{grid-column:1/-1} }
+  @media(max-width:520px){ .sheet{grid-template-columns:1fr} .full,.span2{grid-column:1} }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <!-- HEADER -->
+  <div class="header full">
+    <div class="header-left">
+      <h1 contenteditable="true" id="char-name">NAME</h1>
+      <div class="subtitle" contenteditable="true" id="char-subtitle">// Charakterbogen · Homebrew Tabletop //</div>
+    </div>
+    <div class="class-badge" contenteditable="true" id="char-class">KLASSE</div>
+  </div>
+
+  <!-- VITALS -->
+  <div class="panel red">
+    <div class="panel-title">Kernwerte</div>
+    <div class="vitals-grid">
+      <div class="vital-box">
+        <div class="v-num red">
+          <button class="sb" onclick="step('hp',-1)">−</button>
+          <span id="hp">0</span>
+          <button class="sb" onclick="step('hp',1)">+</button>
+        </div>
+        <div class="v-sub red"><button class="sb xs" onclick="step('hp-max',-1)">−</button><span id="hp-max">0</span><button class="sb xs" onclick="step('hp-max',1)">+</button></div>
+        <div class="v-label">Lebenspunkte</div>
+        <div class="v-detail" contenteditable="true" id="hp-detail"></div>
+      </div>
+      <div class="vital-box">
+        <div class="v-num purple">
+          <button class="sb" onclick="step('schutz',-1)">−</button>
+          <span id="schutz">0</span>
+          <button class="sb" onclick="step('schutz',1)">+</button>
+        </div>
+        <div class="v-label">Schutz</div>
+        <div class="v-detail" contenteditable="true" id="schutz-detail"></div>
+      </div>
+      <div class="vital-box">
+        <div class="v-num blue">
+          <button class="sb" onclick="step('energy',-1)">−</button>
+          <span id="energy">0</span>
+          <button class="sb" onclick="step('energy',1)">+</button>
+        </div>
+        <div class="v-label">Energy</div>
+        <div class="v-detail" contenteditable="true" id="energy-detail"></div>
+      </div>
+      <div class="vital-box">
+        <div class="v-num green">
+          <button class="sb" onclick="step('carried',-1)">−</button>
+          <span id="carried">0</span>
+          <button class="sb" onclick="step('carried',1)">+</button>
+        </div>
+        <div class="v-sub green"><button class="sb xs" onclick="step('load',-1)">−</button><span id="load">0</span><button class="sb xs" onclick="step('load',1)">+</button></div>
+        <div class="v-label">Last</div>
+        <div class="v-detail" contenteditable="true" id="load-detail"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BASISATTRIBUTE -->
+  <div class="panel">
+    <div class="panel-title">Basisattribute</div>
+    <div class="attr-row" style="border-left:3px solid var(--red);">
+      <span class="attr-code">STK</span>
+      <div style="display:flex;align-items:center;gap:4px;">
+        <button class="sb" onclick="step('stk',-1)">−</button>
+        <span class="attr-val red" id="stk">0</span>
+        <button class="sb" onclick="step('stk',1)">+</button>
+      </div>
+    </div>
+    <div class="attr-row" style="border-left:3px solid var(--green);">
+      <span class="attr-code">GES</span>
+      <div style="display:flex;align-items:center;gap:4px;">
+        <button class="sb" onclick="step('ges',-1)">−</button>
+        <span class="attr-val green" id="ges">0</span>
+        <button class="sb" onclick="step('ges',1)">+</button>
+      </div>
+    </div>
+    <div class="attr-row" style="border-left:3px solid var(--blue);">
+      <span class="attr-code">KON</span>
+      <div style="display:flex;align-items:center;gap:4px;">
+        <button class="sb" onclick="step('kon',-1)">−</button>
+        <span class="attr-val blue" id="kon">0</span>
+        <button class="sb" onclick="step('kon',1)">+</button>
+      </div>
+    </div>
+    <div class="attr-row" style="border-left:3px solid var(--accent);">
+      <span class="attr-code">WIL</span>
+      <div style="display:flex;align-items:center;gap:4px;">
+        <button class="sb" onclick="step('wil',-1)">−</button>
+        <span class="attr-val amber" id="wil">0</span>
+        <button class="sb" onclick="step('wil',1)">+</button>
+      </div>
+    </div>
+    <div class="attr-row" style="border-left:3px solid var(--purple);">
+      <span class="attr-code">INT</span>
+      <div style="display:flex;align-items:center;gap:4px;">
+        <button class="sb" onclick="step('int',-1)">−</button>
+        <span class="attr-val purple" id="int">0</span>
+        <button class="sb" onclick="step('int',1)">+</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- INITIATIVE & CURRENCY -->
+  <div class="panel">
+    <div class="panel-title">Initiative & Währung</div>
+    <div class="init-bar">
+      <div class="init-fill" id="init-fill"></div>
+      <div class="init-label">INITIATIVE</div>
+      <div class="init-val">
+        <button class="sb sm" onclick="step('initiative',-1)">−</button>
+        <span id="initiative" contenteditable="true">0</span>
+        <button class="sb sm" onclick="step('initiative',1)">+</button>
+      </div>
+    </div>
+    <div class="init-formula" contenteditable="true" id="init-formula"></div>
+    <div class="currency-box">
+      <div class="lyka-block" style="flex:2;">
+        <div class="lyka-num">
+          <button class="sb sm" onclick="step('lyka1',-5)">−</button>
+          <span id="lyka1" contenteditable="true">0</span>
+          <button class="sb sm" onclick="step('lyka1',5)">+</button>
+          <span style="color:var(--text-dim);font-size:18px;margin:0 2px;">/</span>
+          <button class="sb sm" onclick="step('lyka2',-5)">−</button>
+          <span id="lyka2" contenteditable="true" style="color:var(--accent2);text-shadow:0 0 20px rgba(199,92,42,0.4);">0</span>
+          <button class="sb sm" onclick="step('lyka2',5)">+</button>
+        </div>
+        <div class="lyka-label" contenteditable="true" id="lyka1-label">Lyka</div>
+      </div>
+      <div class="lyka-block" style="border-left:3px solid var(--green);">
+        <div class="lyka-num" style="color:var(--green);text-shadow:0 0 20px rgba(39,174,96,0.4);font-size:22px;">
+          <button class="sb xs" onclick="step('meds',-1)">−</button>
+          <span id="meds" contenteditable="true">0</span>
+          <button class="sb xs" onclick="step('meds',1)">+</button>
+        </div>
+        <div class="lyka-label">Medikamente</div>
+      </div>
+    </div>
+    <div class="currency-box" style="margin-top:8px;">
+      <div class="lyka-block">
+        <div class="lyka-num" style="font-size:22px;">
+          <button class="sb xs" onclick="step('level',-1)">−</button>
+          <span id="level" contenteditable="true">0</span>
+          <button class="sb xs" onclick="step('level',1)">+</button>
+        </div>
+        <div class="lyka-label">Level</div>
+      </div>
+      <div class="lyka-block">
+        <div class="lyka-num" style="font-size:22px;">
+          <button class="sb xs" onclick="step('xp',-1)">−</button>
+          <span id="xp" contenteditable="true">0</span>
+          <button class="sb xs" onclick="step('xp',1)">+</button>
+        </div>
+        <div class="lyka-label">Erfahrung</div>
+      </div>
+      <div class="lyka-block">
+        <div class="lyka-num" style="font-size:22px;">
+          <button class="sb xs" onclick="step('tp',-1)">−</button>
+          <span id="tp" contenteditable="true">0</span>
+          <button class="sb xs" onclick="step('tp',1)">+</button>
+        </div>
+        <div class="lyka-label">Talentpunkte</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SKILLS -->
+  <div class="panel">
+    <div class="panel-title">Allgemein</div>
+    <table class="skill-table" id="tbl-allgemein"></table>
+    <button class="add-row-btn" onclick="addSkill('allgemein')">+ Fertigkeit</button>
+  </div>
+  <div class="panel red">
+    <div class="panel-title">Kampf</div>
+    <table class="skill-table" id="tbl-kampf"></table>
+    <button class="add-row-btn" onclick="addSkill('kampf')">+ Fertigkeit</button>
+  </div>
+  <div class="panel blue">
+    <div class="panel-title">Wissen</div>
+    <table class="skill-table" id="tbl-wissen"></table>
+    <button class="add-row-btn" onclick="addSkill('wissen')">+ Fertigkeit</button>
+  </div>
+
+  <!-- WEAPONS -->
+  <div class="panel full red">
+    <div class="panel-title">Waffen</div>
+    <div id="weapons-list"></div>
+    <button class="add-row-btn" onclick="addWeapon()">+ Waffe hinzufügen</button>
+  </div>
+
+  <!-- INVENTORY -->
+  <div class="panel span2">
+    <div class="panel-title">Ausrüstung & Besitztümer</div>
+    <div id="inventory-list"></div>
+    <button class="add-row-btn" onclick="addItem()">+ Gegenstand hinzufügen</button>
+  </div>
+
+  <!-- ADV / DIS -->
+  <div class="panel">
+    <div class="panel-title">Vor- & Nachteile</div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div class="adv-box">
+        <span class="adv-title" contenteditable="true" id="adv-title">✦ Vorteil</span>
+        <span contenteditable="true" id="adv-body"></span>
+        <div id="adv-table" style="margin-top:8px;"></div>
+      </div>
+      <div class="adv-box dis">
+        <span class="adv-title" contenteditable="true" id="dis-title">✦ Nachteil</span>
+        <span contenteditable="true" id="dis-body"></span>
+        <div id="roll-table" style="margin-top:8px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CLASS ABILITIES -->
+  <div class="panel full">
+    <div class="panel-title">Klassenfertigkeiten</div>
+    <div id="abilities-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;"></div>
+    <button class="add-row-btn" onclick="addAbility()" style="margin-top:10px;">+ Fähigkeit hinzufügen</button>
+  </div>
+
+  <!-- NOTIZEN -->
+  <div class="panel span2">
+    <div class="panel-title">Notizen</div>
+    <div class="notes-area" contenteditable="true" id="notes"></div>
+  </div>
+
+  <!-- CHARAKTEREIGENSCHAFTEN -->
+  <div class="panel">
+    <div class="panel-title">Charaktereigenschaften</div>
+    <div class="char-prop-row">
+      <span class="char-prop-label">Alter</span>
+      <span class="char-prop-val" contenteditable="true" id="prop-alter">—</span>
+    </div>
+    <div class="char-prop-row">
+      <span class="char-prop-label">Größe</span>
+      <span class="char-prop-val" contenteditable="true" id="prop-groesse">—</span>
+    </div>
+    <div class="char-prop-row">
+      <span class="char-prop-label">Gewicht</span>
+      <span class="char-prop-val" contenteditable="true" id="prop-gewicht">—</span>
+    </div>
+    <div class="char-prop-row">
+      <span class="char-prop-label">Körperbau</span>
+      <span class="char-prop-val" contenteditable="true" id="prop-koerperbau">—</span>
+    </div>
+    <div class="char-prop-row" style="align-items:flex-start;">
+      <span class="char-prop-label" style="padding-top:2px;">Besondere Merkmale</span>
+      <span class="char-prop-val char-prop-merkmale" contenteditable="true" id="prop-merkmale">—</span>
+    </div>
+  </div>
+
+</div>
+
+<button class="save-btn" id="save-btn" onclick="saveAll()">💾 SPEICHERN</button>
+<div class="util-btns">
+  <button class="util-btn" onclick="backupData()">⬇ BACKUP</button>
+  <button class="util-btn" onclick="document.getElementById('load-input').click()">⬆ LADEN</button>
+  <button class="util-btn danger" onclick="deleteData()">✕ LÖSCHEN</button>
+</div>
+<input type="file" id="load-input" accept=".json" style="display:none" onchange="loadFromFile(event)">
+<div class="edit-hint">✦ KLICK ZUM BEARBEITEN</div>
+
+<script>
+// ── DEFAULT DATA ──────────────────────────────────────────────────────────────
+const DEF = {
+  nums: { hp:0, 'hp-max':0, load:0, energy:0, carried:0, initiative:0, lyka1:0, lyka2:0, meds:0, stk:0, ges:0, kon:0, wil:0, int:0, schutz:0, xp:0, tp:0, level:0 },
+  texts: {
+    'char-name':'NAME',
+    'char-subtitle':'// Charakterbogen · Homebrew Tabletop //',
+    'char-class':'KLASSE',
+    'hp-detail':'',
+    'load-detail':'',
+    'energy-detail':'',
+    'init-formula':'',
+    'lyka1-label':'Lyka',
+    'adv-title':'✦ Vorteil',
+    'adv-body':'',
+    'dis-title':'✦ Nachteil',
+    'dis-body':'',
+    'schutz-detail':'',
+    'notes':'',
+    'prop-alter':'—','prop-groesse':'—','prop-gewicht':'—','prop-koerperbau':'—','prop-merkmale':'—'
+  },
+  skills: {
+    allgemein: [
+      {n:'Athletik',a:'KON',tw:0},{n:'Ausdauer',a:'KON',tw:0},{n:'Erholung',a:'KON',tw:0},
+      {n:'Fingerfertigkeit',a:'GES',tw:0},{n:'Führungskraft',a:'WIL',tw:0},{n:'Handel',a:'WIL',tw:0},
+      {n:'Kraftanstrengung',a:'STK',tw:0},{n:'Manipulation',a:'WIL',tw:0},{n:'Schleichen',a:'GES',tw:0},
+      {n:'Spürsinn',a:'GES',tw:0},{n:'Transportfertigkeit',a:'GES',tw:0}
+    ],
+    kampf: [
+      {n:'Ausweichen',a:'KON',tw:0},{n:'Faustkampf',a:'STK',tw:0},{n:'Bolzen-/Pfeilgeräte',a:'GES',tw:0},
+      {n:'Feuerwaffen',a:'GES',tw:0},{n:'Heldenmut',a:'WIL',tw:0},{n:'Parade',a:'KON',tw:0},
+      {n:'Spezialfeuerwaffen',a:'GES',tw:0},{n:'Stichwaffen',a:'STK',tw:0},{n:'Stumpfe Waffen',a:'STK',tw:0},
+      {n:'Scharfe Waffen',a:'STK',tw:0},{n:'Wurfwaffen',a:'GES',tw:0}
+    ],
+    wissen: [
+      {n:'Bildung',a:'INT',tw:0},{n:'Gassenwissen',a:'INT',tw:0},{n:'Mechanik',a:'INT',tw:0},
+      {n:'Medizin',a:'INT',tw:0},{n:'Menschenkenntnis',a:'INT',tw:0},{n:'Überlebensfähigkeit',a:'INT',tw:0}
+    ]
+  },
+  inventory: [],
+  rolls: [],
+  advRolls: [],
+  weapons: [],
+  abilities: []
+};
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let S;
+function loadState() {
+  try {
+    const raw = localStorage.getItem('charsheet_leer');
+    S = raw ? JSON.parse(raw) : JSON.parse(JSON.stringify(DEF));
+    S.nums    = {...DEF.nums,  ...S.nums};
+    S.texts   = {...DEF.texts, ...S.texts};
+    if (!S.weapons)   S.weapons   = JSON.parse(JSON.stringify(DEF.weapons));
+    if (!S.inventory) S.inventory = JSON.parse(JSON.stringify(DEF.inventory));
+    if (!S.skills)    S.skills    = JSON.parse(JSON.stringify(DEF.skills));
+    if (!S.rolls)     S.rolls     = JSON.parse(JSON.stringify(DEF.rolls));
+    if (!S.advRolls)  S.advRolls  = JSON.parse(JSON.stringify(DEF.advRolls));
+    if (!S.abilities) S.abilities = JSON.parse(JSON.stringify(DEF.abilities));
+  } catch(e) { S = JSON.parse(JSON.stringify(DEF)); }
+}
+
+// ── NUMERIC STEPPERS ──────────────────────────────────────────────────────────
+function step(k, d) {
+  S.nums[k] = (parseInt(S.nums[k])||0) + d;
+  document.getElementById(k).textContent = S.nums[k];
+  if (k === 'initiative') updateInitBar();
+}
+function updateInitBar() {
+  const v = Math.max(0, Math.min(100, parseInt(S.nums.initiative)||0));
+  document.getElementById('init-fill').style.width = v + '%';
+}
+
+// ── SKILL TABLES ──────────────────────────────────────────────────────────────
+function twCls(tw) { return tw===0 ? 'c0' : tw>=4 ? 'ch' : 'cp'; }
+function twDisp(tw) { return tw===0 ? '—' : (tw>0?'+':'')+tw; }
+
+function buildSkillTable(cat) {
+  const tbl = document.getElementById('tbl-'+cat);
+  tbl.innerHTML = `<thead><tr><th>Fertigkeit</th><th>Attr</th><th class="r">TW</th></tr></thead><tbody></tbody>`;
+  const tbody = tbl.querySelector('tbody');
+  S.skills[cat].forEach((sk,i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td contenteditable="true" class="skill-name-td">${sk.n}</td>
+      <td contenteditable="true" class="attr-td">${sk.a}</td>
+      <td class="tw-td">
+        <button class="sb xs" onclick="stepSkill('${cat}',${i},-1)">−</button>
+        <span class="tw-val ${twCls(sk.tw)}" id="sk-${cat}-${i}">${twDisp(sk.tw)}</span>
+        <button class="sb xs" onclick="stepSkill('${cat}',${i},1)">+</button>
+        <button class="sb xs del-btn" onclick="delSkill('${cat}',${i})" style="margin-left:3px;opacity:0.4;color:var(--red);border-color:var(--red);">✕</button>
+      </td>`;
+    tr.querySelector('.skill-name-td').addEventListener('blur', e => { S.skills[cat][i].n = e.target.innerText.trim(); });
+    tr.querySelector('.attr-td').addEventListener('blur', e => { S.skills[cat][i].a = e.target.innerText.trim(); });
+    tbody.appendChild(tr);
+  });
+}
+function stepSkill(cat,i,d) {
+  S.skills[cat][i].tw = (S.skills[cat][i].tw||0)+d;
+  const sp = document.getElementById(`sk-${cat}-${i}`);
+  sp.textContent = twDisp(S.skills[cat][i].tw);
+  sp.className = `tw-val ${twCls(S.skills[cat][i].tw)}`;
+}
+function delSkill(cat,i) { S.skills[cat].splice(i,1); buildSkillTable(cat); }
+function addSkill(cat) {
+  S.skills[cat].push({n:'Neue Fertigkeit',a:'???',tw:0});
+  buildSkillTable(cat);
+}
+
+// ── INVENTORY ─────────────────────────────────────────────────────────────────
+function renderInventory() {
+  const list = document.getElementById('inventory-list');
+  list.innerHTML = '';
+  S.inventory.forEach((item,i) => {
+    const tags = (item.tags||'').split('|').filter(Boolean);
+    let tagHtml = tags.map(t => {
+      if(t==='destroy') return `<span class="tag d">Zerstörbar</span>`;
+      if(t.startsWith('bonus')) return `<span class="tag b">${t.slice(5)}</span>`;
+      return '';
+    }).join('');
+
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    row.innerHTML = `
+      <div class="iw-wrap">
+        <div class="iw">
+          <button class="sb xs" onclick="stepItemW(${i},-1)">−</button>
+          <span class="iw-v" contenteditable="true" id="iw-${i}">${item.w}</span>
+          <button class="sb xs" onclick="stepItemW(${i},1)">+</button>
+        </div>
+        <div class="iw-label">Last</div>
+      </div>
+      <div class="item-content">
+        <div class="item-name" contenteditable="true" id="in-${i}">${item.n}</div>
+        ${tagHtml ? `<div style="margin-top:2px;">${tagHtml}</div>` : ''}
+        <div class="item-desc" contenteditable="true" id="id-${i}">${parseDesc(item.d)}</div>
+      </div>
+      <button class="del-btn" onclick="delItem(${i})" title="Löschen">✕</button>`;
+    row.querySelector(`#in-${i}`).addEventListener('blur', e => { S.inventory[i].n = e.target.innerText.trim(); });
+    row.querySelector(`#iw-${i}`).addEventListener('blur', e => { S.inventory[i].w = e.target.innerText; });
+    bindDescField(row.querySelector(`#id-${i}`), () => S.inventory[i].d, v => { S.inventory[i].d = v; });
+    list.appendChild(row);
+  });
+}
+function stepItemW(i,d) {
+  S.inventory[i].w = String((parseInt(S.inventory[i].w)||0)+d);
+  renderInventory();
+}
+function delItem(i) { S.inventory.splice(i,1); renderInventory(); }
+function addItem() {
+  S.inventory.push({w:'0',n:'Neuer Gegenstand',d:'',tags:''});
+  renderInventory();
+  setTimeout(()=>{
+    const el = document.getElementById(`in-${S.inventory.length-1}`);
+    if(el){el.focus();document.execCommand('selectAll',false,null);}
+  },40);
+}
+
+// ── TAG PARSER ────────────────────────────────────────────────────────────────
+function parseDesc(text) {
+  const esc = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return esc.replace(/\[([^\]]+)\]/g, (_,inner) => {
+    const t = inner.trim();
+    if (t[0]==='+') return `<span class="tag b">${t.slice(1).trim()}</span>`;
+    if (t[0]==='-') return `<span class="tag d">${t.slice(1).trim()}</span>`;
+    return `<span class="tag" style="background:rgba(42,48,69,0.5);color:var(--text-dim);border:1px solid var(--border);">${t}</span>`;
+  });
+}
+function bindDescField(el, getRaw, setRaw) {
+  el.addEventListener('focus', () => { el.innerText = getRaw(); });
+  el.addEventListener('blur',  () => { setRaw(el.innerText.trim()); el.innerHTML = parseDesc(getRaw()); });
+}
+
+// ── WEAPONS ───────────────────────────────────────────────────────────────────
+function renderWeapons() {
+  const list = document.getElementById('weapons-list');
+  list.innerHTML = '';
+  S.weapons.forEach((wp, i) => {
+    const row = document.createElement('div');
+    row.className = 'weapon-row';
+    row.innerHTML = `
+      <div class="wp-name" contenteditable="true" id="wpn-${i}">${wp.name}</div>
+      <div class="wp-dmg" contenteditable="true" id="wpd-${i}" title="Schaden">${wp.dmg}</div>
+      <div class="wp-counter-wrap">
+        <span class="wp-counter-label">KW</span>
+        <div class="wp-counter">
+          <button class="sb xs" onclick="stepWeapon(${i},'kw',-1)">−</button>
+          <span class="wp-counter-val" id="wpkw-${i}">${wp.kw}</span>
+          <button class="sb xs" onclick="stepWeapon(${i},'kw',1)">+</button>
+        </div>
+      </div>
+      <div class="wp-counter-wrap">
+        <span class="wp-counter-label">NL</span>
+        <div class="wp-counter">
+          <button class="sb xs" onclick="stepWeapon(${i},'nl',-1)">−</button>
+          <span class="wp-counter-val" id="wpnl-${i}">${wp.nl}</span>
+          <button class="sb xs" onclick="stepWeapon(${i},'nl',1)">+</button>
+        </div>
+      </div>
+      <div class="wp-counter-wrap">
+        <span class="wp-counter-label">Last</span>
+        <div class="wp-counter">
+          <button class="sb xs" onclick="stepWeapon(${i},'last',-1)">−</button>
+          <span class="wp-counter-val" id="wplast-${i}">${wp.last||0}</span>
+          <button class="sb xs" onclick="stepWeapon(${i},'last',1)">+</button>
+        </div>
+      </div>
+      <div class="wp-rule" contenteditable="true" id="wpr-${i}" title="Sonderregel">${parseDesc(wp.rule)}</div>
+      <button class="del-btn" onclick="delWeapon(${i})" title="Löschen">✕</button>`;
+    row.querySelector(`#wpn-${i}`).addEventListener('blur', e => { S.weapons[i].name = e.target.innerText.trim(); });
+    row.querySelector(`#wpd-${i}`).addEventListener('blur', e => { S.weapons[i].dmg  = e.target.innerText.trim(); });
+    bindDescField(row.querySelector(`#wpr-${i}`), () => S.weapons[i].rule, v => { S.weapons[i].rule = v; });
+    list.appendChild(row);
+  });
+}
+function stepWeapon(i, field, d) {
+  S.weapons[i][field] = (S.weapons[i][field]||0) + d;
+  const ids = {kw:`wpkw-${i}`, nl:`wpnl-${i}`, last:`wplast-${i}`};
+  document.getElementById(ids[field]).textContent = S.weapons[i][field];
+}
+function delWeapon(i) { S.weapons.splice(i,1); renderWeapons(); }
+function addWeapon() {
+  S.weapons.push({name:'Neue Waffe',dmg:'1W6',kw:1,nl:0,last:0,rule:''});
+  renderWeapons();
+  setTimeout(()=>{ const el=document.getElementById(`wpn-${S.weapons.length-1}`); if(el){el.focus();document.execCommand('selectAll',false,null);} },40);
+}
+
+// ── NUMERIC DIRECT EDIT ───────────────────────────────────────────────────────
+function bindNumField(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('blur', () => {
+    const v = parseInt(el.textContent.replace(/[^0-9\-]/g, '')) || 0;
+    S.nums[id] = v;
+    el.textContent = v;
+    if (id === 'initiative') updateInitBar();
+  });
+}
+
+// ── ROLL TABLE ────────────────────────────────────────────────────────────────
+function renderRolls() {
+  const cont = document.getElementById('roll-table');
+  cont.innerHTML = '';
+  S.rolls.forEach((r,i) => {
+    const div = document.createElement('div');
+    div.className = 'roll-row';
+    div.innerHTML = `
+      <div class="roll-num ${r.cls}" contenteditable="true">${r.num}</div>
+      <div class="roll-desc" contenteditable="true">${r.desc}</div>
+      <button class="del-btn" onclick="delRoll(${i})" style="opacity:0.5;font-size:11px;">✕</button>`;
+    div.querySelector('.roll-num').addEventListener('blur',e=>{ S.rolls[i].num=e.target.innerText; });
+    div.querySelector('.roll-desc').addEventListener('blur',e=>{ S.rolls[i].desc=e.target.innerText; });
+    cont.appendChild(div);
+  });
+  const ab = document.createElement('button');
+  ab.className='add-row-btn'; ab.style.marginTop='5px'; ab.textContent='+ Eintrag';
+  ab.onclick=addRoll; cont.appendChild(ab);
+}
+function delRoll(i){ S.rolls.splice(i,1); renderRolls(); }
+function addRoll(){ S.rolls.push({num:'?',cls:'warn',desc:'Neuer Eintrag'}); renderRolls(); }
+
+// ── ADV TABLE ─────────────────────────────────────────────────────────────────
+function renderAdvRolls() {
+  const cont = document.getElementById('adv-table');
+  cont.innerHTML = '';
+  S.advRolls.forEach((r,i) => {
+    const div = document.createElement('div');
+    div.className = 'roll-row';
+    div.innerHTML = `
+      <div class="roll-num ${r.cls}" contenteditable="true">${r.num}</div>
+      <div class="roll-desc" contenteditable="true">${r.desc}</div>
+      <button class="del-btn" onclick="delAdvRoll(${i})" style="opacity:0.5;font-size:11px;">✕</button>`;
+    div.querySelector('.roll-num').addEventListener('blur',e=>{ S.advRolls[i].num=e.target.innerText; });
+    div.querySelector('.roll-desc').addEventListener('blur',e=>{ S.advRolls[i].desc=e.target.innerText; });
+    cont.appendChild(div);
+  });
+  const ab = document.createElement('button');
+  ab.className='add-row-btn'; ab.style.marginTop='5px'; ab.textContent='+ Eintrag';
+  ab.onclick=addAdvRoll; cont.appendChild(ab);
+}
+function delAdvRoll(i){ S.advRolls.splice(i,1); renderAdvRolls(); }
+function addAdvRoll(){ S.advRolls.push({num:'?',cls:'good',desc:'Neuer Eintrag'}); renderAdvRolls(); }
+
+// ── ABILITIES ─────────────────────────────────────────────────────────────────
+function renderAbilities() {
+  const grid = document.getElementById('abilities-grid');
+  grid.innerHTML = '';
+  S.abilities.forEach((ab,i) => {
+    const card = document.createElement('div');
+    card.className = 'ability-card';
+    card.innerHTML = `
+      <div class="ability-header">
+        <div class="ab-name" contenteditable="true">${ab.name}</div>
+        <div class="ab-attr" contenteditable="true">${ab.attr}</div>
+      </div>
+      <div class="ab-desc" contenteditable="true">${ab.desc}</div>
+      <button class="add-row-btn" onclick="delAbility(${i})" style="margin-top:8px;border-color:var(--red);color:var(--red);">✕ Entfernen</button>`;
+    card.querySelector('.ab-name').addEventListener('blur',e=>{ S.abilities[i].name=e.target.innerText; });
+    card.querySelector('.ab-attr').addEventListener('blur',e=>{ S.abilities[i].attr=e.target.innerText; });
+    card.querySelector('.ab-desc').addEventListener('blur',e=>{ S.abilities[i].desc=e.target.innerText; });
+    grid.appendChild(card);
+  });
+}
+function delAbility(i){ S.abilities.splice(i,1); renderAbilities(); }
+function addAbility(){
+  S.abilities.push({name:'Neue Fähigkeit',attr:'ATTRIBUT',desc:'Beschreibung der Fähigkeit...'});
+  renderAbilities();
+}
+
+// ── SAVE ──────────────────────────────────────────────────────────────────────
+function collectTexts() {
+  Object.keys(S.texts).forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) S.texts[id]=el.innerText;
+  });
+}
+function saveAll() {
+  if (document.activeElement) document.activeElement.blur();
+  collectTexts();
+  localStorage.setItem('charsheet_leer', JSON.stringify(S));
+  const btn = document.getElementById('save-btn');
+  btn.textContent = '✓ GESPEICHERT';
+  btn.classList.add('ok');
+  setTimeout(()=>{ btn.textContent='💾 SPEICHERN'; btn.classList.remove('ok'); }, 1600);
+}
+
+function backupData() {
+  if (document.activeElement) document.activeElement.blur();
+  collectTexts();
+  const name = (S.texts['char-name'] || 'Charakter').replace(/\s+/g,'-');
+  const blob = new Blob([JSON.stringify(S, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${name}_backup.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+function loadFromFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const loaded = JSON.parse(ev.target.result);
+      S = loaded;
+      S.nums    = {...DEF.nums,  ...S.nums};
+      S.texts   = {...DEF.texts, ...S.texts};
+      if (!S.weapons)   S.weapons   = JSON.parse(JSON.stringify(DEF.weapons));
+      if (!S.inventory) S.inventory = JSON.parse(JSON.stringify(DEF.inventory));
+      if (!S.skills)    S.skills    = JSON.parse(JSON.stringify(DEF.skills));
+      if (!S.rolls)     S.rolls     = JSON.parse(JSON.stringify(DEF.rolls));
+      if (!S.advRolls)  S.advRolls  = JSON.parse(JSON.stringify(DEF.advRolls));
+      if (!S.abilities) S.abilities = JSON.parse(JSON.stringify(DEF.abilities));
+      localStorage.setItem('charsheet_leer', JSON.stringify(S));
+      location.reload();
+    } catch { alert('Ungültige Datei.'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+function deleteData() {
+  if (!confirm('Lokale Daten wirklich löschen?')) return;
+  localStorage.removeItem('charsheet_leer');
+  location.reload();
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+function init() {
+  loadState();
+
+  // Numeric
+  Object.entries(S.nums).forEach(([k,v])=>{
+    const el=document.getElementById(k);
+    if(el) el.textContent=v;
+  });
+  updateInitBar();
+
+  // Text fields
+  Object.entries(S.texts).forEach(([id,val])=>{
+    const el=document.getElementById(id);
+    if(el) el.innerText=val;
+  });
+
+  // Bind text autosave on blur
+  Object.keys(S.texts).forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.addEventListener('blur',()=>{ S.texts[id]=el.innerText; });
+  });
+
+  ['initiative','lyka1','lyka2','meds','level','xp','tp'].forEach(bindNumField);
+
+  buildSkillTable('allgemein');
+  buildSkillTable('kampf');
+  buildSkillTable('wissen');
+  renderWeapons();
+  renderInventory();
+  renderRolls();
+  renderAdvRolls();
+  renderAbilities();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
+

@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weapon Wheel</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        background: #1a1a2e;
+        background-image: 
+            radial-gradient(ellipse at 20% 50%, rgba(88, 60, 180, 0.08) 0%, transparent 50%),
+            radial-gradient(ellipse at 80% 50%, rgba(60, 120, 180, 0.08) 0%, transparent 50%);
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-family: 'Inter', sans-serif;
+        overflow: hidden;
+        user-select: none;
+    }
+
+    .wheel-container {
+        position: relative;
+        width: 520px;
+        height: 520px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    /* Outer ring glow */
+    .wheel-container::before {
+        content: '';
+        position: absolute;
+        width: 460px;
+        height: 460px;
+        border-radius: 50%;
+        background: conic-gradient(
+            from 0deg,
+            rgba(255,182,193,0.06),
+            rgba(173,216,230,0.06),
+            rgba(144,238,144,0.06),
+            rgba(255,255,150,0.06),
+            rgba(216,175,216,0.06),
+            rgba(255,182,193,0.06)
+        );
+        border-radius: 50%;
+        animation: rotateGlow 20s linear infinite;
+    }
+
+    @keyframes rotateGlow {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Background circle */
+    .wheel-bg {
+        position: absolute;
+        width: 420px;
+        height: 420px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.02);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    /* Inner decorative rings */
+    .ring {
+        position: absolute;
+        border-radius: 50%;
+        border: 1px solid rgba(255,255,255,0.04);
+    }
+
+    .ring-1 {
+        width: 340px;
+        height: 340px;
+    }
+
+    .ring-2 {
+        width: 260px;
+        height: 260px;
+    }
+
+    .ring-3 {
+        width: 180px;
+        height: 180px;
+        border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    /* Center display */
+    .center-display {
+        position: absolute;
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.08);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 10;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .center-display.active {
+        background: rgba(255,255,255,0.06);
+        border-color: rgba(255,255,255,0.15);
+        box-shadow: 0 0 40px rgba(255,255,255,0.05);
+    }
+
+    .center-icon {
+        font-size: 36px;
+        margin-bottom: 4px;
+        filter: drop-shadow(0 2px 8px rgba(0,0,0,0.3));
+    }
+
+    .center-name {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        color: rgba(255,255,255,0.7);
+        text-align: center;
+        line-height: 1.3;
+    }
+
+    .center-category {
+        font-size: 9px;
+        font-weight: 400;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: rgba(255,255,255,0.35);
+        margin-top: 2px;
+    }
+
+    /* Weapon slots */
+    .slot {
+        position: absolute;
+        width: 90px;
+        height: 90px;
+        border-radius: 50%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        z-index: 5;
+        transform-origin: center center;
+    }
+
+    .slot-inner {
+    width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        position: relative;
+    }
+
+    .slot-icon {
+        font-size: 26px;
+        filter: drop-shadow(0 2px 6px rgba(0,0,0,0.3));
+        transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .slot-label {
+        font-size: 8px;
+        font-weight: 600;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        margin-top: 2px;
+        opacity: 0.6;
+        transition: all 0.4s ease;
+    }
+
+    .slot-number {
+        position: absolute;
+        top: -6px;
+        right: -6px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: rgba(0,0,0,0.4);
+        border: 1px solid rgba(255,255,255,0.15);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 9px;
+        font-weight: 700;
+        color: rgba(255,255,255,0.6);
+        transition: all 0.4s ease;
+    }
+
+    /* Active slot */
+    .slot.active .slot-inner {
+        transform: scale(1.35);
+        box-shadow: 0 0 30px rgba(255,255,255,0.1), 0 0 60px rgba(255,255,255,0.05);
+    }
+
+    .slot.active .slot-icon {
+        transform: scale(1.1);
+    }
+
+    .slot.active .slot-label {
+        opacity: 1;
+        color: rgba(255,255,255,0.95);
+    }
+
+    .slot.active .slot-number {
+        background: rgba(255,255,255,0.2);
+        color: rgba(255,255,255,0.9);
+        transform: scale(1.2);
+    }
+
+    /* Hover effect */
+    .slot:hover .slot-inner {
+        transform: scale(1.15);
+    }
+
+    .slot:hover .slot-label {
+        opacity: 1;
+    }
+
+    /* Connector lines */
+    .connector {
+        position: absolute;
+        height: 1px;
+        background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent);
+        transform-origin: left center;
+        z-index: 2;
+        transition: all 0.5s ease;
+        opacity: 0;
+    }
+
+    .connector.active {
+        opacity: 1;
+        background: linear-gradient(90deg, rgba(255,255,255,0.15), transparent);
+    }
+
+    /* Hint text */
+    .hint {
+        position: fixed;
+        bottom: 40px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: rgba(255,255,255,0.25);
+        font-size: 12px;
+        font-weight: 400;
+        letter-spacing: 1px;
+    }
+
+    .scroll-icon {
+        width: 24px;
+        height: 38px;
+        border: 1.5px solid rgba(255,255,255,0.2);
+        border-radius: 12px;
+        position: relative;
+        display: flex;
+        justify-content: center;
+    }
+
+    .scroll-icon::after {
+        content: '';
+        width: 3px;
+        height: 8px;
+        background: rgba(255,255,255,0.3);
+        border-radius: 2px;
+        animation: scrollHint 1.5s ease-in-out infinite;
+    }
+
+    @keyframes scrollHint {
+        0%, 100% { transform: translateY(-4px); opacity: 0.3; }
+        50% { transform: translateY(4px); opacity: 1; }
+    }
+
+    /* Pulse animation for active */
+    @keyframes pulse {
+        0%, 100% { opacity: 0.6; }
+        50% { opacity: 1; }
+    }
+
+    .slot.active .slot-number {
+        animation: pulse 2s ease-in-out infinite;
+    }
+
+    /* Particle effect container */
+    .particles {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    .particle {
+        position: absolute;
+        width: 2px;
+        height: 2px;
+        background: rgba(255,255,255,0.15);
+        border-radius: 50%;
+        animation: float linear infinite;
+    }
+
+    @keyframes float {
+        0% { transform: translateY(0) scale(1); opacity: 0; }
+        10% { opacity: 1; }
+        90% { opacity: 1; }
+        100% { transform: translateY(-200px) scale(0); opacity: 0; }
+    }
+</style>
+</head>
+<body>
+
+<div class="wheel-container" id="wheel">
+    <div class="wheel-bg"></div>
+    <div class="ring ring-1"></div>
+    <div class="ring ring-2"></div>
+    <div class="ring ring-3"></div>
+    <div class="particles" id="particles"></div>
+    
+    <div class="center-display" id="centerDisplay">
+        <div class="center-icon" id="centerIcon">🔫</div>
+        <div class="center-name" id="centerName">Pistol</div>
+        <div class="center-category" id="centerCategory">Sidearm</div>
+    </div>
+</div>
+
+<div class="hint">
+    <div class="scroll-icon"></div>
+    <span>SCROLL TO SELECT</span>
+</div>
+
+<script>
+const weapons = [
+    { icon: '🔫', name: 'Pistol', category: 'Sidearm', color: '#FFB5C2', bg: 'rgba(255,181,194,0.15)', border: 'rgba(255,181,194,0.3)' },
+    { icon: '🗡️', name: 'Katana', category: 'Melee', color: '#B5D8FF', bg: 'rgba(181,216,255,0.15)', border: 'rgba(181,216,255,0.3)' },
+    { icon: '🏹', name: 'Bow', category: 'Ranged', color: '#B5FFB8', bg: 'rgba(181,255,184,0.15)', border: 'rgba(181,255,184,0.3)' },
+    { icon: '💣', name: 'Grenade', category: 'Explosive', color: '#FFF5B5', bg: 'rgba(255,245,181,0.15)', border: 'rgba(255,245,181,0.3)' },
+    { icon: '🪓', name: 'Axe', category: 'Melee', color: '#D8B5FF', bg: 'rgba(216,181,255,0.15)', border: 'rgba(216,181,255,0.3)' },
+    { icon: '🔥', name: 'Flamethrower', category: 'Heavy', color: '#FFD4B5', bg: 'rgba(255,212,181,0.15)', border: 'rgba(255,212,181,0.3)' },
+    { icon: '🛡️', name: 'Shield', category: 'Defense', color: '#B5FFF0', bg: 'rgba(181,255,240,0.15)', border: 'rgba(181,255,240,0.3)' },
+    { icon: '⚡', name: 'Railgun', category: 'Energy', color: '#FFB5F0', bg: 'rgba(255,181,240,0.15)', border: 'rgba(255,181,240,0.3)' },
+];
+
+const selectedIndex = 0;
+const radius = 175;
+const total = weapons.length;
+const angleStep = (2 * Math.PI) / total;
+const startAngle = -Math.PI / 2; // Start from top
+
+const wheel = document.getElementById('wheel');
+const centerDisplay = document.getElementById('centerDisplay');
+const centerIcon = document.getElementById('centerIcon');
+const centerName = document.getElementById('centerName');
+const centerCategory = document.getElementById('centerCategory');
+
+let currentSelection = selectedIndex;
+let isAnimating = false;
+
+// Create slots
+const slots = [];
+const connectors = [];
+
+weapons.forEach((weapon, i) => {
+    const angle = startAngle + i * angleStep;
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius;
+
+    // Slot
+    const slot = document.createElement('div');
+    slot.className = 'slot';
+    slot.style.left = `calc(50% + ${x}px - 45px)`;
+    slot.style.top = `calc(50% + ${y}px - 45px)`;
+    slot.dataset.index = i;
+
+    slot.innerHTML = `
+        <div class="slot-inner" style="background: ${weapon.bg}; border: 1px solid ${weapon.border};">
+            <span class="slot-icon">${weapon.icon}</span>
+            <span class="slot-label">${weapon.name}</span>
+            <span class="slot-number">${i + 1}</span>
+        </div>
+    `;
+
+    slot.addEventListener('click', () => selectWeapon(i));
+    wheel.appendChild(slot);
+    slots.push(slot);
+
+    // Connector line
+    const connector = document.createElement('div');
+    connector.className = 'connector';
+    const dist = radius - 75;
+    const angleDeg = (angle * 180) / Math.PI;
+    connector.style.width = `${dist}px`;
+    connector.style.left = '50%';
+    connector.style.top = '50%';
+    connector.style.transform = `rotate(${angleDeg}deg)`;
+    wheel.appendChild(connector);
+    connectors.push(connector);
+});
+
+function selectWeapon(index) {
+    if (isAnimating || index === currentSelection) return;
+    isAnimating = true;
+
+    // Remove active from all
+    slots.forEach(s => s.classList.remove('active'));
+    connectors.forEach(c => c.classList.remove('active'));
+    centerDisplay.classList.remove('active');
+
+    // Animate transition
+    const oldIndex = currentSelection;
+    currentSelection = index;
+
+    // Update center
+    const weapon = weapons[currentSelection];
+    centerIcon.style.opacity = 0;
+    centerName.style.opacity = 0;
+    centerCategory.style.opacity = 0;
+
+    setTimeout(() => {
+        centerIcon.textContent = weapon.icon;
+        centerName.textContent = weapon.name;
+        centerCategory.textContent = weapon.category;
+        centerDisplay.style.borderColor = weapon.border;
+        centerDisplay.style.background = weapon.bg;
+        centerDisplay.style.boxShadow = `0 0 40px ${weapon.bg}, 0 0 80px ${weapon.bg}`;
+        centerIcon.style.opacity = 1;
+        centerName.style.opacity = 1;
+        centerCategory.style.opacity = 1;
+        centerDisplay.classList.add('active');
+    }, 200);
+
+    // Activate new slot
+    setTimeout(() => {
+        slots[currentSelection].classList.add('active');
+        connectors[currentSelection].classList.add('active');
+        isAnimating = false;
+    }, 200);
+}
+
+// Scroll wheel
+let scrollTimeout;
+document.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    clearTimeout(scrollTimeout);
+    
+    scrollTimeout = setTimeout(() => {
+        if (e.deltaY > 0) {
+            selectWeapon((currentSelection + 1) % total);
+        } else {
+            selectWeapon((currentSelection - 1 + total) % total);
+        }
+    }, 50);
+}, { passive: false });
+
+// Keyboard support
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        selectWeapon((currentSelection + 1) % total);
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        selectWeapon((currentSelection - 1 + total) % total);
+    } else if (e.key >= '1' && e.key <= '8') {
+        selectWeapon(parseInt(e.key) - 1);
+    }
+});
+
+// Create floating particles
+const particlesContainer = document.getElementById('particles');
+for (let i = 0; i < 20; i++) {
+    const particle = document.createElement('div');
+    particle.className = 'particle';
+    particle.style.left = `${Math.random() * 100}%`;
+    particle.style.top = `${Math.random() * 100}%`;
+    particle.style.animationDuration = `${8 + Math.random() * 12}s`;
+    particle.style.animationDelay = `${Math.random() * 10}s`;
+    particle.style.width = `${1 + Math.random() * 2}px`;
+    particle.style.height = particle.style.width;
+    particlesContainer.appendChild(particle);
+}
+
+// Initialize first slot
+setTimeout(() => {
+    slots[selectedIndex].classList.add('active');
+    centerDisplay.classList.add('active');
+    centerDisplay.style.borderColor = weapons[selectedIndex].border;
+    centerDisplay.style.background = weapons[selectedIndex].bg;
+    centerDisplay.style.boxShadow = `0 0 40px ${weapons[selectedIndex].bg}, 0 0 80px ${weapons[selectedIndex].bg}`;
+}, 100);
+
+// Add transition styles dynamically
+centerIcon.style.transition = 'opacity 0.2s ease';
+centerName.style.transition = 'opacity 0.2s ease';
+centerCategory.style.transition = 'opacity 0.2s ease';
+centerDisplay.style.transition = 'all 0.4s ease';
+</script>
+
+</body>
+</html>
+

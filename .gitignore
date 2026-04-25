@@ -1,2 +1,5 @@
 # Claude Code local settings
 .claude/
+
+# Private data files (tool content, study materials, etc.)
+tools/**/*.md
