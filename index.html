@@ -227,6 +227,90 @@
       padding: 1px 4px;
       font-size: 10px;
     }
+
+    /* ── README modal ── */
+    #readme-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.6);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    #readme-overlay.open { display: flex; }
+
+    #readme-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      width: 100%;
+      max-width: 740px;
+      max-height: calc(100vh - 48px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #readme-header {
+      display: flex;
+      align-items: center;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    #readme-title {
+      flex: 1;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    #readme-close {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      padding: 2px 6px;
+      font-size: 18px;
+      line-height: 1;
+      border-radius: 4px;
+      transition: color .12s, background .12s;
+    }
+
+    #readme-close:hover { color: var(--text); background: var(--surface-2); }
+
+    #readme-body {
+      padding: 20px 24px;
+      overflow-y: auto;
+      line-height: 1.65;
+      font-size: 14px;
+      color: var(--text);
+    }
+
+    #readme-body::-webkit-scrollbar { width: 4px; }
+    #readme-body::-webkit-scrollbar-track { background: transparent; }
+    #readme-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* Markdown styles */
+    #readme-body h1 { font-size: 1.5em; font-weight: 700; margin: 0 0 .6em; color: var(--text); }
+    #readme-body h2 { font-size: 1.2em; font-weight: 600; margin: 1.2em 0 .5em; padding-bottom: .3em; border-bottom: 1px solid var(--border); color: var(--text); }
+    #readme-body h3 { font-size: 1em; font-weight: 600; margin: 1em 0 .4em; color: var(--text); }
+    #readme-body p { margin: .6em 0; }
+    #readme-body ul, #readme-body ol { padding-left: 1.4em; margin: .5em 0; }
+    #readme-body li { margin: .25em 0; }
+    #readme-body pre { background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; overflow-x: auto; margin: .8em 0; }
+    #readme-body pre code { background: none; border: none; padding: 0; font-size: 13px; color: #a8d8a8; }
+    #readme-body code { background: var(--surface-2); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; font-size: .875em; color: #f8c8a0; font-family: ui-monospace, monospace; }
+    #readme-body a { color: var(--accent); text-decoration: none; }
+    #readme-body a:hover { text-decoration: underline; }
+    #readme-body strong { font-weight: 600; color: var(--text); }
+    #readme-body em { font-style: italic; }
+    #readme-body .md-no-readme { color: var(--text-dim); font-style: italic; }
   </style>
 </head>
 <body>
@@ -246,6 +330,16 @@
 <div id="main">
   <div id="toolbar">
     <span id="active-title">No tool selected</span>
+    <button class="tb-btn" id="btn-readme" disabled title="View README">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+        <polyline points="10 9 9 9 8 9"/>
+      </svg>
+      README
+    </button>
     <button class="tb-btn" id="btn-reload" disabled title="Reload current tool (Ctrl+R)">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
         <path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5"/>
@@ -279,6 +373,16 @@
 
 <div id="kb-hint"><kbd>Ctrl+K</kbd> search &nbsp;·&nbsp; <kbd>↑↓</kbd> navigate &nbsp;·&nbsp; <kbd>Enter</kbd> open</div>
 
+<div id="readme-overlay">
+  <div id="readme-card">
+    <div id="readme-header">
+      <span id="readme-title">README</span>
+      <button id="readme-close" title="Close (Esc)">&#x2715;</button>
+    </div>
+    <div id="readme-body"></div>
+  </div>
+</div>
+
 <script>
   const STORAGE_KEY = 'tcc_last_tool';
   const list = document.getElementById('tool-list');
@@ -289,7 +393,11 @@
   const activeTitle = document.getElementById('active-title');
   const btnReload = document.getElementById('btn-reload');
   const btnOpen = document.getElementById('btn-open');
+  const btnReadme = document.getElementById('btn-readme');
   const toolCount = document.getElementById('tool-count');
+  const readmeOverlay = document.getElementById('readme-overlay');
+  const readmeTitle = document.getElementById('readme-title');
+  const readmeBody = document.getElementById('readme-body');
 
   let tools = [];
   let activeTool = null;
@@ -349,6 +457,7 @@
     activeTitle.textContent = tool.name;
     btnReload.disabled = false;
     btnOpen.disabled = false;
+    btnReadme.disabled = false;
     localStorage.setItem(STORAGE_KEY, tool.file);
     updateURL(tool.name);
     // Re-render to update active highlight
@@ -379,6 +488,79 @@
   // ── Search ──
   search.addEventListener('input', () => renderList(search.value));
 
+  // ── README modal ──
+  function renderMarkdown(md) {
+    // Escape HTML
+    let html = md
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    // Fenced code blocks (must come before inline code)
+    html = html.replace(/```[^\n]*\n([\s\S]*?)```/g, (_, code) =>
+      `<pre><code>${code.trimEnd()}</code></pre>`);
+
+    // Headings
+    html = html.replace(/^###### (.+)$/gm, '<h6>$1</h6>');
+    html = html.replace(/^##### (.+)$/gm, '<h5>$1</h5>');
+    html = html.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
+    html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+    html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+    // Bold + italic (order matters)
+    html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+    // Inline code
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    // Links
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+    // Unordered list items → wrap consecutive <li> in <ul>
+    html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+    html = html.replace(/(<li>[\s\S]*?<\/li>)(\n(?!<li>)|$)/g, '$1\n</ul>\n');
+    html = html.replace(/(?<!<\/ul>\n|<ul>\n)(<li>)/g, '<ul>\n$1');
+
+    // Paragraphs: blank lines → paragraph breaks
+    html = html.split(/\n{2,}/).map(block => {
+      if (/^<(h[1-6]|pre|ul|ol|li)/.test(block.trim())) return block;
+      const trimmed = block.trim();
+      if (!trimmed) return '';
+      return `<p>${trimmed.replace(/\n/g, ' ')}</p>`;
+    }).join('\n');
+
+    return html;
+  }
+
+  async function openReadme() {
+    if (!activeTool) return;
+    const dir = activeTool.file.substring(0, activeTool.file.lastIndexOf('/'));
+    const readmePath = dir + '/README.md';
+    readmeTitle.textContent = activeTool.name + ' — README';
+    readmeBody.innerHTML = '<p style="color:var(--text-dim)">Loading…</p>';
+    readmeOverlay.classList.add('open');
+
+    try {
+      const res = await fetch(readmePath + '?t=' + Date.now());
+      if (!res.ok) throw new Error('not found');
+      const text = await res.text();
+      readmeBody.innerHTML = renderMarkdown(text);
+    } catch {
+      readmeBody.innerHTML = '<p class="md-no-readme">No README found for this tool.</p>';
+    }
+  }
+
+  function closeReadme() {
+    readmeOverlay.classList.remove('open');
+  }
+
+  btnReadme.addEventListener('click', openReadme);
+  document.getElementById('readme-close').addEventListener('click', closeReadme);
+  readmeOverlay.addEventListener('click', e => { if (e.target === readmeOverlay) closeReadme(); });
+
   // ── Toolbar buttons ──
   btnReload.addEventListener('click', () => {
     if (activeTool) viewer.src = activeTool.file;
@@ -390,6 +572,12 @@
 
   // ── Keyboard navigation ──
   document.addEventListener('keydown', e => {
+    // Escape → close README modal
+    if (e.key === 'Escape' && readmeOverlay.classList.contains('open')) {
+      closeReadme();
+      return;
+    }
+
     // Ctrl+K → focus search
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
       e.preventDefault();
