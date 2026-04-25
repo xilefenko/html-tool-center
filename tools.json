@@ -2,5 +2,21 @@
   {
     "name": "Flashcards",
     "file": "tools/Flashcards/Flashcards.html"
+  },
+  {
+    "name": "Habit Mood Visualizer",
+    "file": "tools/Habit Mood Visualizer/habit-mood-visualizer.html"
+  },
+  {
+    "name": "Schrottgesellschaft",
+    "file": "tools/Schrottgesellschaft/Schrottgesellschaft.html"
+  },
+  {
+    "name": "Scroll Wheel",
+    "file": "tools/Scroll Wheel/Scroll Wheel.html"
+  },
+  {
+    "name": "Timeline",
+    "file": "tools/Timeline/Timeline.html"
   }
 ]
