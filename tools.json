@@ -1,5 +1,9 @@
 [
   {
+    "name": "CSS Live Editor",
+    "file": "tools/CSS Live Editor/CSS Live Editor.html"
+  },
+  {
     "name": "Flashcards",
     "file": "tools/Flashcards/Flashcards.html"
   },
@@ -18,5 +22,9 @@
   {
     "name": "Timeline",
     "file": "tools/Timeline/Timeline.html"
+  },
+  {
+    "name": "TRACKR",
+    "file": "tools/TRACKR/TRACKR.html"
   }
 ]
