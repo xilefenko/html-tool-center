@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Blueprint → Token Optimizer</title>
+<style>
+  :root {
+    --bg: #0e1116;
+    --panel: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --warn: #d29922;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  h1 {
+    font-size: 16px;
+    margin: 0;
+    font-weight: 600;
+  }
+  .sub { color: var(--muted); font-size: 12px; }
+  .controls { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+  button {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #0d1117; border-color: var(--accent); font-weight: 600; }
+  button.primary:hover { filter: brightness(1.1); }
+  label.toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    overflow: hidden;
+  }
+  .pane {
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .pane-head {
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .stat { color: var(--accent2); font-family: monospace; }
+  .stat.warn { color: var(--warn); }
+  textarea {
+    flex: 1;
+    background: var(--panel);
+    color: var(--text);
+    border: none;
+    padding: 14px;
+    font-family: "SF Mono", Consolas, monospace;
+    font-size: 12px;
+    resize: none;
+    outline: none;
+    line-height: 1.5;
+    white-space: pre;
+    overflow: auto;
+  }
+  textarea:focus { background: #1a2028; }
+  .empty {
+    color: var(--muted);
+    text-align: center;
+    padding: 40px 20px;
+    font-size: 13px;
+  }
+  @media (max-width: 800px) {
+    main { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Blueprint → Token Optimizer</h1>
+    <div class="sub">Paste UE Blueprint copy-paste text. Get compact format ready for AI-to-C++ conversion.</div>
+  </div>
+  <div class="controls">
+    <label class="toggle"><input type="checkbox" id="dropPositions" checked> drop positions</label>
+    <label class="toggle"><input type="checkbox" id="dropDefaults" checked> drop defaults</label>
+    <label class="toggle"><input type="checkbox" id="shortIds" checked> short IDs</label>
+    <button id="loadExample">Load Example</button>
+    <button id="clearBtn">Clear</button>
+    <button id="copyBtn">Copy Output</button>
+    <button class="primary" id="optimizeBtn">Optimize ▶</button>
+  </div>
+</header>
+
+<main>
+  <section class="pane">
+    <div class="pane-head">
+      <span>INPUT — Blueprint Text</span>
+      <span class="stat" id="inStat">0 chars</span>
+    </div>
+    <textarea id="input" placeholder="Paste Blueprint text here (Begin Object ... End Object)..." spellcheck="false"></textarea>
+  </section>
+  <section class="pane">
+    <div class="pane-head">
+      <span>OUTPUT — Token-Optimized</span>
+      <span class="stat" id="outStat">—</span>
+    </div>
+    <textarea id="output" placeholder="Optimized output appears here..." spellcheck="false"></textarea>
+  </section>
+</main>
+
+<script>
+// ===== Blueprint parser =====
+// Splits the raw text into node blocks, then each block into a header + properties.
+
+function parseBlueprint(text) {
+  const nodes = [];
+  // Match Begin Object ... End Object blocks
+  const blockRe = /Begin Object([\s\S]*?)End Object/g;
+  let m;
+  while ((m = blockRe.exec(text)) !== null) {
+    const body = m[1];
+    nodes.push(parseNode(body));
+  }
+  return nodes;
+}
+
+function parseNode(body) {
+  const lines = body.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const node = { class: '', name: '', props: {}, pins: [] };
+
+  // First line is the header: Class=... Name="..." ExportPath=...
+  const header = lines.shift() || '';
+  const classMatch = header.match(/Class=([^\s]+)/);
+  const nameMatch = header.match(/Name="([^"]+)"/);
+  if (classMatch) node.class = classMatch[1].split('.').pop();
+  if (nameMatch) node.name = nameMatch[1];
+
+  for (const line of lines) {
+    if (line.startsWith('CustomProperties Pin')) {
+      node.pins.push(parsePin(line));
+    } else {
+      const eq = line.indexOf('=');
+      if (eq > -1) {
+        const key = line.slice(0, eq).trim();
+        const val = line.slice(eq + 1).trim();
+        node.props[key] = val;
+      }
+    }
+  }
+  return node;
+}
+
+function parsePin(line) {
+  // Strip "CustomProperties Pin (" prefix and trailing ")"
+  const inner = line.replace(/^CustomProperties Pin\s*\(/, '').replace(/\)\s*$/, '');
+  const pin = {};
+  // Split by commas not inside parens or quotes
+  const parts = smartSplit(inner);
+  for (const part of parts) {
+    const eq = part.indexOf('=');
+    if (eq < 0) continue;
+    const key = part.slice(0, eq).trim();
+    const val = part.slice(eq + 1).trim();
+    pin[key] = stripQuotes(val);
+  }
+  return pin;
+}
+
+function smartSplit(s) {
+  const out = [];
+  let depth = 0, inStr = false, start = 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === '"' && s[i-1] !== '\\') inStr = !inStr;
+    else if (!inStr && c === '(') depth++;
+    else if (!inStr && c === ')') depth--;
+    else if (!inStr && c === ',' && depth === 0) {
+      out.push(s.slice(start, i));
+      start = i + 1;
+    }
+  }
+  if (start < s.length) out.push(s.slice(start));
+  return out;
+}
+
+function stripQuotes(v) {
+  if (v.startsWith('"') && v.endsWith('"')) return v.slice(1, -1);
+  return v;
+}
+
+// ===== Optimizer =====
+
+function optimize(nodes, opts) {
+  // Build pin GUID → "nodeAlias.pinName" lookup
+  const pinMap = {};
+  const nodeAlias = {};
+
+  // Assign short aliases
+  let counter = 1;
+  for (const n of nodes) {
+    if (opts.shortIds) {
+      // Use a meaningful short alias: class abbreviation + counter
+      const short = shortClass(n.class) + counter++;
+      nodeAlias[n.name] = short;
+    } else {
+      nodeAlias[n.name] = n.name;
+    }
+  }
+
+  for (const n of nodes) {
+    for (const p of n.pins) {
+      if (p.PinId) {
+        pinMap[p.PinId] = `${nodeAlias[n.name]}.${p.PinName || '?'}`;
+      }
+    }
+  }
+
+  // Build output
+  const out = [];
+
+  // Header: function info if available
+  const entry = nodes.find(n => n.class === 'K2Node_FunctionEntry');
+  if (entry && entry.props.FunctionReference) {
+    const memberMatch = entry.props.FunctionReference.match(/MemberName="([^"]+)"/);
+    const parentMatch = entry.props.FunctionReference.match(/MemberParent="[^']+'([^']+)'/);
+    if (memberMatch) {
+      out.push(`# Function: ${memberMatch[1]}`);
+      if (parentMatch) out.push(`# Parent: ${parentMatch[1].split('.').pop()}`);
+      out.push('');
+    }
+  }
+
+  for (const n of nodes) {
+    out.push(formatNode(n, nodeAlias, pinMap, opts));
+    out.push('');
+  }
+
+  return out.join('\n').trim();
+}
+
+function shortClass(cls) {
+  const map = {
+    'K2Node_FunctionEntry': 'Entry',
+    'K2Node_FunctionResult': 'Return',
+    'K2Node_CallFunction': 'Call',
+    'K2Node_VariableGet': 'Get',
+    'K2Node_VariableSet': 'Set',
+    'K2Node_MakeStruct': 'Make',
+    'K2Node_BreakStruct': 'Break',
+    'K2Node_Select': 'Select',
+    'K2Node_IfThenElse': 'Branch',
+    'K2Node_ExecutionSequence': 'Seq',
+    'K2Node_DynamicCast': 'Cast',
+    'K2Node_Knot': 'Reroute',
+    'K2Node_CommutativeAssociativeBinaryOperator': 'Op',
+    'K2Node_Literal': 'Lit',
+    'K2Node_Self': 'Self',
+  };
+  return map[cls] || cls.replace(/^K2Node_/, '');
+}
+
+function formatNode(n, nodeAlias, pinMap, opts) {
+  const lines = [];
+  const alias = nodeAlias[n.name];
+  const cls = shortClass(n.class);
+
+  // Header line — node identity
+  let header = `[${alias}] ${cls}`;
+
+  // Add the most informative property to the header
+  if (n.class === 'K2Node_VariableGet' || n.class === 'K2Node_VariableSet') {
+    const m = n.props.VariableReference && n.props.VariableReference.match(/MemberName="([^"]+)"/);
+    if (m) header += ` ${m[1]}`;
+  } else if (n.class === 'K2Node_CallFunction') {
+    const m = n.props.FunctionReference && n.props.FunctionReference.match(/MemberName="([^"]+)"/);
+    const parent = n.props.FunctionReference && n.props.FunctionReference.match(/MemberParent="[^']+'([^']+)'/);
+    if (m) {
+      const parentName = parent ? parent[1].split('.').pop() : '';
+      header += ` ${parentName ? parentName + '::' : ''}${m[1]}`;
+    }
+    if (n.props.bDefaultsToPureFunc === 'True') header += ' [pure]';
+  } else if (n.class === 'K2Node_MakeStruct' || n.class === 'K2Node_BreakStruct') {
+    const m = n.props.StructType && n.props.StructType.match(/'([^']+)'/);
+    if (m) header += ` ${m[1].split('.').pop()}`;
+  } else if (n.class === 'K2Node_Select') {
+    if (n.props.Enum) {
+      const m = n.props.Enum.match(/'([^']+)'/);
+      if (m) header += ` (enum: ${m[1].split('.').pop()})`;
+    } else {
+      header += ' (bool)';
+    }
+  } else if (n.class === 'K2Node_FunctionEntry' || n.class === 'K2Node_FunctionResult') {
+    const m = n.props.FunctionReference && n.props.FunctionReference.match(/MemberName="([^"]+)"/);
+    if (m) header += ` ${m[1]}`;
+  }
+
+  if (!opts.dropPositions && n.props.NodePosX !== undefined) {
+    header += ` @(${n.props.NodePosX},${n.props.NodePosY})`;
+  }
+
+  lines.push(header);
+
+  // Pins
+  for (const p of n.pins) {
+    const pinLine = formatPin(p, pinMap, opts);
+    if (pinLine) lines.push('  ' + pinLine);
+  }
+
+  return lines.join('\n');
+}
+
+function formatPin(p, pinMap, opts) {
+  const dir = p.Direction === 'EGPD_Output' ? '→' : '←';
+  const name = p.PinName || '?';
+
+  // Type compression
+  let type = compressType(p);
+
+  // Linked-to references
+  const links = parseLinks(p.LinkedTo, pinMap);
+  const linkStr = links.length ? `  ⇒ ${links.join(', ')}` : '';
+
+  // Default value
+  let dflt = '';
+  if (p.DefaultValue && p.DefaultValue !== 'false' && p.DefaultValue !== '0' && p.DefaultValue !== '') {
+    if (!opts.dropDefaults || links.length === 0) {
+      dflt = ` = ${p.DefaultValue}`;
+    }
+  }
+
+  // Hidden / orphan flags
+  const flags = [];
+  if (p.bHidden === 'True') flags.push('hidden');
+  if (p.bOrphanedPin === 'True') flags.push('orphan');
+  const flagStr = flags.length ? ` [${flags.join(',')}]` : '';
+
+  // Skip self pins that are hidden and unlinked — pure noise
+  if (name === 'self' && p.bHidden === 'True' && links.length === 0) return null;
+
+  return `${dir} ${name}: ${type}${dflt}${flagStr}${linkStr}`;
+}
+
+function compressType(p) {
+  const cat = p['PinType.PinCategory'] || '';
+  const subObj = p['PinType.PinSubCategoryObject'] || '';
+  const container = p['PinType.ContainerType'] || '';
+  const isRef = p['PinType.bIsReference'] === 'True';
+
+  let t = cat;
+  if (subObj && subObj !== 'None') {
+    const m = subObj.match(/'([^']+)'/);
+    if (m) {
+      const short = m[1].split('.').pop();
+      t = `${cat}<${short}>`;
+    }
+  }
+  if (container && container !== 'None') t = `${container}<${t}>`;
+  if (isRef) t += '&';
+  return t;
+}
+
+function parseLinks(linkedTo, pinMap) {
+  if (!linkedTo) return [];
+  // Format: (NodeName PinGUID,NodeName PinGUID,)
+  const inner = linkedTo.replace(/^\(/, '').replace(/,?\)$/, '');
+  if (!inner.trim()) return [];
+  const parts = inner.split(',').map(s => s.trim()).filter(Boolean);
+  const out = [];
+  for (const part of parts) {
+    const tokens = part.split(/\s+/);
+    if (tokens.length >= 2) {
+      const guid = tokens[1];
+      out.push(pinMap[guid] || `?.${guid.slice(0, 6)}`);
+    }
+  }
+  return out;
+}
+
+// ===== UI wiring =====
+
+const inputEl = document.getElementById('input');
+const outputEl = document.getElementById('output');
+const inStat = document.getElementById('inStat');
+const outStat = document.getElementById('outStat');
+
+function updateStats() {
+  const inLen = inputEl.value.length;
+  const outLen = outputEl.value.length;
+  inStat.textContent = `${inLen.toLocaleString()} chars`;
+  if (outLen > 0 && inLen > 0) {
+    const pct = ((1 - outLen / inLen) * 100).toFixed(1);
+    outStat.textContent = `${outLen.toLocaleString()} chars  (-${pct}%)`;
+    outStat.classList.toggle('warn', pct < 30);
+  } else {
+    outStat.textContent = '—';
+  }
+}
+
+inputEl.addEventListener('input', updateStats);
+
+document.getElementById('optimizeBtn').addEventListener('click', () => {
+  const opts = {
+    dropPositions: document.getElementById('dropPositions').checked,
+    dropDefaults: document.getElementById('dropDefaults').checked,
+    shortIds: document.getElementById('shortIds').checked,
+  };
+  try {
+    const nodes = parseBlueprint(inputEl.value);
+    if (nodes.length === 0) {
+      outputEl.value = '// No Blueprint nodes found. Make sure you pasted "Begin Object ... End Object" blocks.';
+    } else {
+      outputEl.value = optimize(nodes, opts);
+    }
+  } catch (e) {
+    outputEl.value = '// Error: ' + e.message;
+  }
+  updateStats();
+});
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  inputEl.value = '';
+  outputEl.value = '';
+  updateStats();
+});
+
+document.getElementById('copyBtn').addEventListener('click', () => {
+  outputEl.select();
+  document.execCommand('copy');
+});
+
+document.getElementById('loadExample').addEventListener('click', () => {
+  inputEl.value = EXAMPLE_TEXT;
+  updateStats();
+  document.getElementById('optimizeBtn').click();
+});
+
+const EXAMPLE_TEXT = `Begin Object Class=/Script/BlueprintGraph.K2Node_FunctionEntry Name="K2Node_FunctionEntry_0"
+   FunctionReference=(MemberParent="/Script/CoreUObject.Class'/Script/CharacterCustomizer.BPI_SandboxCharacterPawn'",MemberName="Get_PropertiesForCamera")
+   NodePosX=-784
+   NodePosY=-48
+   NodeGuid=B5DA3D8B51104D72AA384976397DAB48
+   CustomProperties Pin (PinId=9410805505654A8BAE78CC50B68A7BE7,PinName="then",Direction="EGPD_Output",PinType.PinCategory="exec",PinType.bIsReference=False,LinkedTo=(K2Node_VariableGet_4 A24E3CDB6F0641EFB95C2C741F9962A9,),)
+End Object
+Begin Object Class=/Script/BlueprintGraph.K2Node_VariableGet Name="K2Node_VariableGet_4"
+   VariableReference=(MemberName="Mover",bSelfContext=True)
+   NodePosX=-467
+   NodePosY=-48
+   NodeGuid=743B0F7C6E22447FAE19E7003A8B31E1
+   CustomProperties Pin (PinId=A24E3CDB6F0641EFB95C2C741F9962A9,PinName="execute",PinType.PinCategory="exec",LinkedTo=(K2Node_FunctionEntry_0 9410805505654A8BAE78CC50B68A7BE7,),)
+   CustomProperties Pin (PinId=D69100BB24264BD6990D59CB3F620116,PinName="then",PinFriendlyName="Is Valid",Direction="EGPD_Output",PinType.PinCategory="exec",LinkedTo=(K2Node_FunctionResult_0 3151D2967FC042848DF941A3F0A35898,),)
+End Object`;
+
+updateStats();
+</script>
+
+</body>
+</html>
