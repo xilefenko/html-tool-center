@@ -1,5 +1,9 @@
 [
   {
+    "name": "Bp Optimizer",
+    "file": "tools/BP Optimizer/bp_optimizer.html"
+  },
+  {
     "name": "CSS Live Editor",
     "file": "tools/CSS Live Editor/CSS Live Editor.html"
   },
