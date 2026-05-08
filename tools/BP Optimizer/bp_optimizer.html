@@ -24,7 +24,43 @@
     display: flex;
     flex-direction: column;
   }
-  header {
+  header.app-header {
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: stretch;
+    padding: 0 12px;
+  }
+  nav.tabs {
+    display: flex;
+    gap: 0;
+    flex: 1;
+  }
+  .tab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    padding: 12px 18px;
+    color: var(--muted);
+    font-size: 13px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: color 0.1s, border-color 0.1s;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+  .tab-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .tab-panel[hidden] { display: none; }
+  .tab-header {
     padding: 12px 20px;
     border-bottom: 1px solid var(--border);
     display: flex;
@@ -66,6 +102,7 @@
     gap: 1px;
     background: var(--border);
     overflow: hidden;
+    min-height: 0;
   }
   .pane {
     background: var(--bg);
@@ -108,44 +145,227 @@
   @media (max-width: 800px) {
     main { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
   }
+  .log-section {
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+    max-height: 40vh;
+    flex-shrink: 0;
+  }
+  .log-head {
+    padding: 8px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+    user-select: none;
+  }
+  .log-head:hover { background: #1a2028; }
+  .log-count {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 7px;
+    border-radius: 10px;
+    background: var(--border);
+    color: var(--text);
+    font-size: 11px;
+    font-family: monospace;
+  }
+  .log-count.has-warnings {
+    background: var(--warn);
+    color: #0d1117;
+  }
+  .log-arrow { transition: transform 0.15s; display: inline-block; }
+  .log-section.open .log-arrow { transform: rotate(90deg); }
+  .log-body {
+    overflow-y: auto;
+    padding: 4px 14px 12px;
+    font-family: "SF Mono", Consolas, monospace;
+    font-size: 11px;
+    line-height: 1.6;
+    display: none;
+  }
+  .log-section.open .log-body { display: block; }
+  .log-entry {
+    padding: 5px 8px;
+    border-left: 3px solid var(--warn);
+    margin-bottom: 4px;
+    background: #1a2028;
+    border-radius: 2px;
+  }
+  .log-entry .log-type {
+    color: var(--warn);
+    font-weight: 600;
+    margin-right: 8px;
+  }
+  .log-entry .log-msg { color: var(--text); }
+  .log-entry .log-sample {
+    display: block;
+    color: var(--muted);
+    margin-top: 3px;
+    word-break: break-all;
+    white-space: pre-wrap;
+  }
+  .log-empty {
+    color: var(--muted);
+    font-style: italic;
+    padding: 4px 0;
+  }
 </style>
 </head>
 <body>
 
-<header>
-  <div>
-    <h1>Blueprint → Token Optimizer</h1>
-    <div class="sub">Paste UE Blueprint copy-paste text. Get compact format ready for AI-to-C++ conversion.</div>
-  </div>
-  <div class="controls">
-    <label class="toggle"><input type="checkbox" id="dropPositions" checked> drop positions</label>
-    <label class="toggle"><input type="checkbox" id="dropDefaults" checked> drop defaults</label>
-    <label class="toggle"><input type="checkbox" id="shortIds" checked> short IDs</label>
-    <button id="loadExample">Load Example</button>
-    <button id="clearBtn">Clear</button>
-    <button id="copyBtn">Copy Output</button>
-    <button class="primary" id="optimizeBtn">Optimize ▶</button>
-  </div>
+<header class="app-header">
+  <nav class="tabs">
+    <button class="tab active" data-tab="bp">Blueprint</button>
+    <button class="tab" data-tab="chooser">Chooser Table</button>
+  </nav>
 </header>
 
-<main>
-  <section class="pane">
-    <div class="pane-head">
-      <span>INPUT — Blueprint Text</span>
-      <span class="stat" id="inStat">0 chars</span>
+<!-- ========== TAB 1: Blueprint ========== -->
+<div class="tab-panel" data-tab="bp">
+  <div class="tab-header">
+    <div>
+      <h1>Blueprint → Token Optimizer</h1>
+      <div class="sub">Paste UE Blueprint copy-paste text. Get compact format ready for AI-to-C++ conversion.</div>
     </div>
-    <textarea id="input" placeholder="Paste Blueprint text here (Begin Object ... End Object)..." spellcheck="false"></textarea>
-  </section>
-  <section class="pane">
-    <div class="pane-head">
-      <span>OUTPUT — Token-Optimized</span>
-      <span class="stat" id="outStat">—</span>
+    <div class="controls">
+      <label class="toggle"><input type="checkbox" id="dropPositions" checked> drop positions</label>
+      <label class="toggle"><input type="checkbox" id="dropDefaults" checked> drop defaults</label>
+      <label class="toggle"><input type="checkbox" id="shortIds" checked> short IDs</label>
+      <button id="loadExample">Load Example</button>
+      <button id="clearBtn">Clear</button>
+      <button id="copyBtn">Copy Output</button>
+      <button class="primary" id="optimizeBtn">Optimize ▶</button>
     </div>
-    <textarea id="output" placeholder="Optimized output appears here..." spellcheck="false"></textarea>
-  </section>
-</main>
+  </div>
+  <main>
+    <section class="pane">
+      <div class="pane-head">
+        <span>INPUT — Blueprint Text</span>
+        <span class="stat" id="inStat">0 chars</span>
+      </div>
+      <textarea id="input" placeholder="Paste Blueprint text here (Begin Object ... End Object)..." spellcheck="false"></textarea>
+    </section>
+    <section class="pane">
+      <div class="pane-head">
+        <span>OUTPUT — Token-Optimized</span>
+        <span class="stat" id="outStat">—</span>
+      </div>
+      <textarea id="output" placeholder="Optimized output appears here..." spellcheck="false"></textarea>
+    </section>
+  </main>
+</div>
+
+<!-- ========== TAB 2: Chooser Table ========== -->
+<div class="tab-panel" data-tab="chooser" hidden>
+  <div class="tab-header">
+    <div>
+      <h1>Chooser Table → Token Optimizer</h1>
+      <div class="sub">Paste a UE Chooser Table (Begin Object Class=/Script/Chooser.ChooserTable). Get a compact decision table.</div>
+    </div>
+    <div class="controls">
+      <label class="toggle"><input type="checkbox" id="ctblDropDefaults" checked> drop default-struct fields</label>
+      <label class="toggle"><input type="checkbox" id="ctblShortAssets" checked> short asset names</label>
+      <label class="toggle"><input type="checkbox" id="ctblShowDisabled" checked> show disabled rows</label>
+      <button id="ctblLoadExample">Load Example</button>
+      <button id="ctblClearBtn">Clear</button>
+      <button id="ctblCopyBtn">Copy Output</button>
+      <button class="primary" id="ctblOptimizeBtn">Optimize ▶</button>
+    </div>
+  </div>
+  <main>
+    <section class="pane">
+      <div class="pane-head">
+        <span>INPUT — Chooser Table Text</span>
+        <span class="stat" id="ctblInStat">0 chars</span>
+      </div>
+      <textarea id="ctblInput" placeholder="Paste Chooser Table text here (Begin Object Class=/Script/Chooser.ChooserTable ... End Object)..." spellcheck="false"></textarea>
+    </section>
+    <section class="pane">
+      <div class="pane-head">
+        <span>OUTPUT — Decision Table</span>
+        <span class="stat" id="ctblOutStat">—</span>
+      </div>
+      <textarea id="ctblOutput" placeholder="Optimized decision table appears here..." spellcheck="false"></textarea>
+    </section>
+  </main>
+</div>
+
+<footer class="log-section" id="logSection">
+  <div class="log-head" id="logToggle">
+    <span>LOG <span class="log-count" id="logCount">0</span></span>
+    <span class="log-arrow" id="logArrow">▸</span>
+  </div>
+  <div class="log-body" id="logBody">
+    <div class="log-empty">No unknown conventions encountered.</div>
+  </div>
+</footer>
 
 <script>
+// ===== Warning log =====
+// Tracks Blueprint conventions we've seen but don't fully handle.
+
+const SHORT_CLASS_MAP = {
+  'K2Node_FunctionEntry': 'Entry',
+  'K2Node_FunctionResult': 'Return',
+  'K2Node_CallFunction': 'Call',
+  'K2Node_CallArrayFunction': 'CallArr',
+  'K2Node_VariableGet': 'Get',
+  'K2Node_VariableSet': 'Set',
+  'K2Node_MakeStruct': 'Make',
+  'K2Node_BreakStruct': 'Break',
+  'K2Node_SetFieldsInStruct': 'SetFields',
+  'K2Node_Select': 'Select',
+  'K2Node_IfThenElse': 'Branch',
+  'K2Node_ExecutionSequence': 'Seq',
+  'K2Node_DynamicCast': 'Cast',
+  'K2Node_Knot': 'Reroute',
+  'K2Node_CommutativeAssociativeBinaryOperator': 'Op',
+  'K2Node_PromotableOperator': 'Op',
+  'K2Node_EnumEquality': 'EnumEq',
+  'K2Node_EnumInequality': 'EnumNeq',
+  'K2Node_GetEnumeratorNameAsString': 'EnumName',
+  'K2Node_EvaluateChooser2': 'Chooser',
+  'K2Node_GetArrayItem': 'GetItem',
+  'K2Node_Literal': 'Lit',
+  'K2Node_Self': 'Self',
+  'K2Node_Event': 'Event',
+  'K2Node_CustomEvent': 'CustomEvent',
+  'K2Node_ComponentBoundEvent': 'BoundEvent',
+  'K2Node_CallDelegate': 'CallDelegate',
+  'K2Node_AddDelegate': 'AddDelegate',
+  'K2Node_CreateDelegate': 'CreateDelegate',
+  'K2Node_VariableSetRef': 'SetRef',
+  'K2Node_StateTreeBlueprintPropertyRef': 'STPropRef',
+  'K2Node_MacroInstance': 'Macro',
+  'K2Node_Message': 'Message',
+  'K2Node_PlayMontageOnMoverActor': 'PlayMontage',
+  'EdGraphNode_Comment': 'Comment',
+};
+
+const KNOWN_CLASSES = new Set(Object.keys(SHORT_CLASS_MAP));
+
+const KNOWN_PIN_CATEGORIES = new Set([
+  'exec', 'bool', 'int', 'int64', 'byte', 'float', 'real', 'double',
+  'string', 'name', 'text', 'struct', 'object', 'class', 'interface',
+  'softobject', 'softclass', 'softobjectpath', 'delegate', 'mcdelegate',
+  'wildcard', 'enum', 'asset', 'assetclass',
+]);
+
+let warnings = [];
+
+function clearWarnings() { warnings = []; }
+
+function logWarning(type, message, sample) {
+  const key = type + '|' + message + '|' + (sample || '');
+  if (warnings.some(w => w._key === key)) return;
+  warnings.push({ type, message, sample: sample || '', _key: key });
+}
+
 // ===== Blueprint parser =====
 // Splits the raw text into node blocks, then each block into a header + properties.
 
@@ -154,9 +374,19 @@ function parseBlueprint(text) {
   // Match Begin Object ... End Object blocks
   const blockRe = /Begin Object([\s\S]*?)End Object/g;
   let m;
+  let lastEnd = 0;
   while ((m = blockRe.exec(text)) !== null) {
+    const between = text.slice(lastEnd, m.index).trim();
+    if (between) {
+      logWarning('stray-text', 'Text found outside Begin/End Object blocks', between.slice(0, 160));
+    }
     const body = m[1];
     nodes.push(parseNode(body));
+    lastEnd = m.index + m[0].length;
+  }
+  const trailing = text.slice(lastEnd).trim();
+  if (trailing) {
+    logWarning('stray-text', 'Trailing text after final End Object', trailing.slice(0, 160));
   }
   return nodes;
 }
@@ -170,17 +400,26 @@ function parseNode(body) {
   const classMatch = header.match(/Class=([^\s]+)/);
   const nameMatch = header.match(/Name="([^"]+)"/);
   if (classMatch) node.class = classMatch[1].split('.').pop();
+  else logWarning('node-header', 'Object header has no Class= field', header.slice(0, 160));
   if (nameMatch) node.name = nameMatch[1];
+  else logWarning('node-header', 'Object header has no Name= field', header.slice(0, 160));
 
   for (const line of lines) {
     if (line.startsWith('CustomProperties Pin')) {
       node.pins.push(parsePin(line));
+    } else if (line.startsWith('CustomProperties UserDefinedPin')) {
+      // Schema declaration for user-defined pins on CustomEvent/etc.
+      // The actual connections live in regular Pin lines, so skip silently.
+    } else if (line.startsWith('CustomProperties ')) {
+      logWarning('custom-prop', 'Unknown CustomProperties variant', line.slice(0, 200));
     } else {
       const eq = line.indexOf('=');
       if (eq > -1) {
         const key = line.slice(0, eq).trim();
         const val = line.slice(eq + 1).trim();
         node.props[key] = val;
+      } else {
+        logWarning('unparsed-line', `Unparseable line in ${node.class || 'unknown node'}`, line.slice(0, 200));
       }
     }
   }
@@ -235,6 +474,9 @@ function optimize(nodes, opts) {
   // Assign short aliases
   let counter = 1;
   for (const n of nodes) {
+    if (n.class && !KNOWN_CLASSES.has(n.class)) {
+      logWarning('node-class', 'Unknown node class — using fallback formatting', `${n.class} (node ${n.name})`);
+    }
     if (opts.shortIds) {
       // Use a meaningful short alias: class abbreviation + counter
       const short = shortClass(n.class) + counter++;
@@ -276,24 +518,7 @@ function optimize(nodes, opts) {
 }
 
 function shortClass(cls) {
-  const map = {
-    'K2Node_FunctionEntry': 'Entry',
-    'K2Node_FunctionResult': 'Return',
-    'K2Node_CallFunction': 'Call',
-    'K2Node_VariableGet': 'Get',
-    'K2Node_VariableSet': 'Set',
-    'K2Node_MakeStruct': 'Make',
-    'K2Node_BreakStruct': 'Break',
-    'K2Node_Select': 'Select',
-    'K2Node_IfThenElse': 'Branch',
-    'K2Node_ExecutionSequence': 'Seq',
-    'K2Node_DynamicCast': 'Cast',
-    'K2Node_Knot': 'Reroute',
-    'K2Node_CommutativeAssociativeBinaryOperator': 'Op',
-    'K2Node_Literal': 'Lit',
-    'K2Node_Self': 'Self',
-  };
-  return map[cls] || cls.replace(/^K2Node_/, '');
+  return SHORT_CLASS_MAP[cls] || cls.replace(/^K2Node_/, '');
 }
 
 function formatNode(n, nodeAlias, pinMap, opts) {
@@ -308,15 +533,47 @@ function formatNode(n, nodeAlias, pinMap, opts) {
   if (n.class === 'K2Node_VariableGet' || n.class === 'K2Node_VariableSet') {
     const m = n.props.VariableReference && n.props.VariableReference.match(/MemberName="([^"]+)"/);
     if (m) header += ` ${m[1]}`;
-  } else if (n.class === 'K2Node_CallFunction') {
-    const m = n.props.FunctionReference && n.props.FunctionReference.match(/MemberName="([^"]+)"/);
-    const parent = n.props.FunctionReference && n.props.FunctionReference.match(/MemberParent="[^']+'([^']+)'/);
+  } else if (n.class === 'K2Node_CallFunction' || n.class === 'K2Node_CallArrayFunction' || n.class === 'K2Node_PromotableOperator' || n.class === 'K2Node_Message') {
+    if (n.class === 'K2Node_PromotableOperator' && n.props.OperationName) {
+      header += ` ${stripQuotes(n.props.OperationName)}`;
+    } else {
+      const m = n.props.FunctionReference && n.props.FunctionReference.match(/MemberName="([^"]+)"/);
+      const parent = n.props.FunctionReference && n.props.FunctionReference.match(/MemberParent="[^']+'([^']+)'/);
+      if (m) {
+        const parentName = parent ? parent[1].split('.').pop() : '';
+        header += ` ${parentName ? parentName + '::' : ''}${m[1]}`;
+      }
+    }
+    if (n.props.bDefaultsToPureFunc === 'True') header += ' [pure]';
+    if (n.class === 'K2Node_Message') header += ' [interface]';
+  } else if (n.class === 'K2Node_Event') {
+    const m = n.props.EventReference && n.props.EventReference.match(/MemberName="([^"]+)"/);
+    const parent = n.props.EventReference && n.props.EventReference.match(/MemberParent="[^']+'([^']+)'/);
     if (m) {
       const parentName = parent ? parent[1].split('.').pop() : '';
       header += ` ${parentName ? parentName + '::' : ''}${m[1]}`;
     }
-    if (n.props.bDefaultsToPureFunc === 'True') header += ' [pure]';
-  } else if (n.class === 'K2Node_MakeStruct' || n.class === 'K2Node_BreakStruct') {
+    if (n.props.bOverrideFunction === 'True') header += ' [override]';
+  } else if (n.class === 'K2Node_CustomEvent') {
+    if (n.props.CustomFunctionName) header += ` ${stripQuotes(n.props.CustomFunctionName)}`;
+  } else if (n.class === 'K2Node_ComponentBoundEvent') {
+    const comp = n.props.ComponentPropertyName ? stripQuotes(n.props.ComponentPropertyName) : '';
+    const dele = n.props.DelegatePropertyName ? stripQuotes(n.props.DelegatePropertyName) : '';
+    if (comp || dele) header += ` ${comp || '?'}.${dele || '?'}`;
+  } else if (n.class === 'K2Node_CallDelegate' || n.class === 'K2Node_AddDelegate') {
+    const m = n.props.DelegateReference && n.props.DelegateReference.match(/MemberName="([^"]+)"/);
+    if (m) header += ` ${m[1]}`;
+  } else if (n.class === 'K2Node_CreateDelegate') {
+    if (n.props.SelectedFunctionName) header += ` ${stripQuotes(n.props.SelectedFunctionName)}`;
+  } else if (n.class === 'K2Node_MacroInstance') {
+    // MacroGraph="/Script/Engine.EdGraph'/.../StandardMacros.StandardMacros:IsValid'"
+    const m = n.props.MacroGraphReference && n.props.MacroGraphReference.match(/MacroGraph="[^']+'([^']+)'/);
+    if (m) {
+      const path = m[1];
+      const tail = path.includes(':') ? path.split(':').pop() : path.split('.').pop();
+      header += ` ${tail}`;
+    }
+  } else if (n.class === 'K2Node_MakeStruct' || n.class === 'K2Node_BreakStruct' || n.class === 'K2Node_SetFieldsInStruct') {
     const m = n.props.StructType && n.props.StructType.match(/'([^']+)'/);
     if (m) header += ` ${m[1].split('.').pop()}`;
   } else if (n.class === 'K2Node_Select') {
@@ -329,6 +586,15 @@ function formatNode(n, nodeAlias, pinMap, opts) {
   } else if (n.class === 'K2Node_FunctionEntry' || n.class === 'K2Node_FunctionResult') {
     const m = n.props.FunctionReference && n.props.FunctionReference.match(/MemberName="([^"]+)"/);
     if (m) header += ` ${m[1]}`;
+  } else if (n.class === 'EdGraphNode_Comment') {
+    const cmt = n.props.NodeComment ? stripQuotes(n.props.NodeComment).replace(/\\'/g, "'").replace(/\\"/g, '"') : '';
+    if (cmt) header += ` "${cmt}"`;
+  }
+
+  // Surface NodeComment on non-comment nodes (devs leave context notes here)
+  if (n.class !== 'EdGraphNode_Comment' && n.props.NodeComment) {
+    const cmt = stripQuotes(n.props.NodeComment).replace(/\\'/g, "'").replace(/\\"/g, '"');
+    header += `  // ${cmt}`;
   }
 
   if (!opts.dropPositions && n.props.NodePosX !== undefined) {
@@ -383,6 +649,10 @@ function compressType(p) {
   const container = p['PinType.ContainerType'] || '';
   const isRef = p['PinType.bIsReference'] === 'True';
 
+  if (cat && !KNOWN_PIN_CATEGORIES.has(cat)) {
+    logWarning('pin-category', 'Unknown pin category', `${cat} on pin ${p.PinName || '?'}`);
+  }
+
   let t = cat;
   if (subObj && subObj !== 'None') {
     const m = subObj.match(/'([^']+)'/);
@@ -413,7 +683,603 @@ function parseLinks(linkedTo, pinMap) {
   return out;
 }
 
-// ===== UI wiring =====
+// ===== Chooser Table parser =====
+// Parses /Script/Chooser.ChooserTable export blocks.
+
+const KNOWN_COLUMN_TYPES = new Set([
+  'FloatRangeColumn', 'EnumColumn', 'MultiEnumColumn', 'BoolColumn',
+  'OutputStructColumn', 'StructColumn', 'GameplayTagColumn',
+  'OutputFloatColumn', 'OutputBoolColumn', 'OutputObjectColumn', 'ObjectColumn',
+]);
+
+// Walks Begin Object / End Object pairs accounting for arbitrary nesting.
+// Returns top-level blocks; nested children live on `.children`.
+function parseObjectBlocks(text) {
+  const tops = [];
+  const stack = [];
+  const lines = text.split(/\r?\n/);
+  for (const line of lines) {
+    const t = line.trim();
+    if (/^Begin\s+Object\b/.test(t)) {
+      const classM = t.match(/Class=(\S+)/);
+      const nameM = t.match(/Name="([^"]+)"/);
+      const block = {
+        class: classM ? classM[1] : null,
+        name: nameM ? nameM[1] : null,
+        directContent: [],
+        children: [],
+      };
+      if (stack.length > 0) stack[stack.length - 1].children.push(block);
+      stack.push(block);
+      continue;
+    }
+    if (/^End\s+Object\s*$/.test(t)) {
+      const finished = stack.pop();
+      if (finished && stack.length === 0) tops.push(finished);
+      continue;
+    }
+    if (stack.length > 0) stack[stack.length - 1].directContent.push(line);
+  }
+  return tops;
+}
+
+function isChooserTableClass(cls) {
+  return !!(cls && cls.includes('/Script/Chooser.ChooserTable'));
+}
+
+function hasChooserContent(block) {
+  return block.directContent.some(l => /^\s*(ResultsStructs|ColumnsStructs)\(/.test(l));
+}
+
+function parseChooserTables(text) {
+  const tops = parseObjectBlocks(text);
+  const tables = [];
+  for (const b of tops) {
+    const isClassChooser = isChooserTableClass(b.class);
+    const isContentChooser = !b.class && hasChooserContent(b);
+    if (!isClassChooser && !isContentChooser) continue;
+    const body = b.directContent.join('\n');
+    const data = parseSingleChooserTable(b.name || '(unnamed)', body);
+    // Collect names of nested ChooserTable children so the user knows what's referenced.
+    const childNames = [];
+    for (const c of b.children) {
+      if (!c.name) continue;
+      if (isChooserTableClass(c.class) || hasChooserContent(c)) {
+        if (!childNames.includes(c.name)) childNames.push(c.name);
+      }
+    }
+    data.children = childNames;
+    tables.push(data);
+  }
+  return tables;
+}
+
+function parseSingleChooserTable(name, body) {
+  const data = {
+    name,
+    results: {},        // index -> { type, asset, fullPath }
+    disabledRows: {},   // index -> bool
+    columns: [],        // [{ type, props }]
+    contextData: [],    // [{ type, target, direction }]
+    outputObjectType: null,
+    rowCount: 0,
+  };
+
+  const lines = body.split(/\r?\n/);
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+
+    const idxMatch = line.match(/^(\w+)\((\d+)\)=([\s\S]*)$/);
+    if (idxMatch) {
+      const key = idxMatch[1];
+      const idx = parseInt(idxMatch[2], 10);
+      const val = idxMatch[3];
+
+      if (key === 'ResultsStructs') {
+        data.results[idx] = parseChooserResult(val);
+      } else if (key === 'DisabledRows') {
+        data.disabledRows[idx] = (val === 'True');
+      } else if (key === 'ColumnsStructs') {
+        data.columns[idx] = parseChooserColumn(val);
+      } else if (key === 'ContextData') {
+        data.contextData[idx] = parseChooserContext(val);
+      } else if (key === 'NestedObjects') {
+        // Registry of child object refs — already surfaced via ResultsStructs NestedChooser entries.
+      } else {
+        logWarning('chooser-key', 'Unknown indexed property in ChooserTable', `${key}(${idx})=${val.slice(0, 100)}`);
+      }
+      continue;
+    }
+
+    const kv = line.match(/^(\w+)=([\s\S]*)$/);
+    if (kv) {
+      const key = kv[1];
+      const val = kv[2];
+      if (key === 'OutputObjectType') {
+        const m2 = val.match(/'([^']+)'/);
+        data.outputObjectType = m2 ? m2[1].split('.').pop() : stripQuotes(val);
+      }
+      // Other top-level fields silently ignored.
+    }
+  }
+
+  // Determine row count from highest index seen.
+  let maxRow = -1;
+  for (const k of Object.keys(data.results)) maxRow = Math.max(maxRow, parseInt(k, 10));
+  for (const k of Object.keys(data.disabledRows)) maxRow = Math.max(maxRow, parseInt(k, 10));
+  for (const col of data.columns) {
+    const rvStr = getColumnRowValuesString(col);
+    if (rvStr) {
+      const rows = parseRowValuesArray(rvStr);
+      maxRow = Math.max(maxRow, rows.length - 1);
+    }
+  }
+  data.rowCount = maxRow + 1;
+
+  return data;
+}
+
+// BoolColumn stores its rows in `RowValuesWithAny` (bare tokens) rather than `RowValues`.
+function getColumnRowValuesString(col) {
+  if (!col || !col.props) return '';
+  if (col.type === 'BoolColumn' && col.props.RowValuesWithAny) return col.props.RowValuesWithAny;
+  return col.props.RowValues || '';
+}
+
+function parseChooserResult(val) {
+  // /Script/Chooser.AssetChooser(Asset="/Script/Engine.AnimSequence'/path.name'")
+  // /Script/Chooser.NestedChooser(Chooser="/Script/Chooser.ChooserTable'Jumps F'")
+  const typeMatch = val.match(/^\/Script\/Chooser\.(\w+)\(/);
+  const type = typeMatch ? typeMatch[1] : 'Unknown';
+
+  if (type === 'NestedChooser') {
+    const m = val.match(/Chooser="[^']*'([^']+)'"/) || val.match(/Chooser="([^"]+)"/);
+    if (m) {
+      const raw = m[1];
+      const name = raw.includes('.') ? raw.split('.').pop() : raw;
+      return { type, asset: name, fullPath: raw };
+    }
+    return { type, asset: null, raw: val };
+  }
+
+  if (/Asset=None\b/.test(val)) return { type, asset: null };
+
+  const assetMatch = val.match(/Asset="[^']*'([^']+)'"/);
+  if (assetMatch) {
+    const fullPath = assetMatch[1];
+    return { type, asset: fullPath.split('.').pop(), fullPath };
+  }
+  // Fallback: any quoted path
+  const anyPath = val.match(/'([^']+)'/);
+  if (anyPath) {
+    return { type, asset: anyPath[1].split('.').pop(), fullPath: anyPath[1] };
+  }
+  return { type, asset: null, raw: val };
+}
+
+function parseChooserColumn(val) {
+  const typeMatch = val.match(/^\/Script\/Chooser\.(\w+)\(/);
+  if (!typeMatch) {
+    logWarning('chooser-col-fmt', 'Could not parse column type', val.slice(0, 100));
+    return { type: 'Unknown', raw: val, props: {} };
+  }
+  const type = typeMatch[1];
+  if (!KNOWN_COLUMN_TYPES.has(type)) {
+    logWarning('chooser-col-type', 'Unrecognized chooser column type', type);
+  }
+  const startIdx = val.indexOf('(');
+  const endIdx = val.lastIndexOf(')');
+  if (startIdx < 0 || endIdx < 0) return { type, props: {} };
+  const inner = val.slice(startIdx + 1, endIdx);
+  return { type, props: parseStructProps(inner) };
+}
+
+function parseChooserContext(val) {
+  // /Script/Chooser.ContextObjectTypeClass(Class="...",Direction=ReadWrite)
+  // /Script/Chooser.ContextObjectTypeStruct(Struct="...",Direction=Write)
+  const typeMatch = val.match(/^\/Script\/Chooser\.(\w+)\(/);
+  const type = typeMatch ? typeMatch[1] : 'Unknown';
+  const startIdx = val.indexOf('(');
+  const endIdx = val.lastIndexOf(')');
+  const inner = (startIdx >= 0 && endIdx >= 0) ? val.slice(startIdx + 1, endIdx) : '';
+  const props = parseStructProps(inner);
+  let target = '?';
+  let kind = '';
+  if (props.Class) {
+    const m = props.Class.match(/'([^']+)'/);
+    target = m ? m[1].split('.').pop() : stripQuotes(props.Class);
+    kind = 'class';
+  } else if (props.Struct) {
+    const m = props.Struct.match(/'([^']+)'/);
+    target = m ? m[1].split('.').pop() : stripQuotes(props.Struct);
+    kind = 'struct';
+  }
+  return { type, kind, target, direction: props.Direction || '?' };
+}
+
+function parseStructProps(s) {
+  const out = {};
+  if (!s) return out;
+  for (const part of smartSplit(s)) {
+    const eq = part.indexOf('=');
+    if (eq < 0) continue;
+    out[part.slice(0, eq).trim()] = part.slice(eq + 1).trim();
+  }
+  return out;
+}
+
+function parseStructValue(val) {
+  if (!val) return null;
+  const typeMatch = val.match(/^\/Script\/[\w.]+\.(\w+)\(/);
+  const type = typeMatch ? typeMatch[1] : null;
+  const startIdx = val.indexOf('(');
+  const endIdx = val.lastIndexOf(')');
+  if (startIdx < 0 || endIdx < 0) return null;
+  const inner = val.slice(startIdx + 1, endIdx);
+  return { type, props: parseStructProps(inner) };
+}
+
+function parseRowValuesArray(rv) {
+  // rv is "((...),(...),...)" or "(/Script/...(...),/Script/...(...))"
+  if (!rv) return [];
+  const inner = rv.replace(/^\(/, '').replace(/\)$/, '');
+  if (!inner.trim()) return [];
+  return smartSplit(inner).map(s => s.trim());
+}
+
+// ===== Chooser Table optimizer =====
+
+function optimizeChooserTable(text, opts) {
+  clearWarnings();
+  const tables = parseChooserTables(text);
+  if (tables.length === 0) {
+    return '// No ChooserTable found. Make sure the input contains a "Begin Object Class=/Script/Chooser.ChooserTable ... End Object" block.';
+  }
+  return tables.map(t => formatChooserTable(t, opts)).join('\n\n---\n\n');
+}
+
+function formatChooserTable(data, opts) {
+  const lines = [];
+
+  // ----- Metadata header -----
+  lines.push(`# Chooser Table: ${data.name}`);
+  if (data.outputObjectType) lines.push(`# Output Type: ${data.outputObjectType}`);
+
+  const inputCols = data.columns.filter(c => c && !isOutputColumn(c));
+  const outputCols = data.columns.filter(c => c && isOutputColumn(c));
+  lines.push(`# Rows: ${data.rowCount}  |  Inputs: ${inputCols.length}  |  Outputs: ${outputCols.length}`);
+
+  // Nested children referenced by this table (parse them separately for detail).
+  if (data.children && data.children.length > 0) {
+    lines.push(`# Children: ${data.children.join(', ')}  (parse each separately for inner rows)`);
+  }
+  lines.push('');
+
+  // Context
+  if (data.contextData.length > 0) {
+    lines.push('# Context:');
+    data.contextData.forEach((c, i) => {
+      if (!c) return;
+      lines.push(`#   [${i}] ${c.target} (${c.kind || c.type}, ${c.direction})`);
+    });
+    lines.push('');
+  }
+
+  // Column descriptions
+  lines.push('# Columns:');
+  data.columns.forEach((col, i) => {
+    if (!col) return;
+    const info = describeColumn(col);
+    const tag = isOutputColumn(col) ? 'OUT' : 'IN ';
+    lines.push(`#   [${tag}] C${i + 1}: ${info.title}  <${info.typeLabel}>${info.extra ? '  ' + info.extra : ''}`);
+    if (info.defaultLine) lines.push(`#         default: ${info.defaultLine}`);
+  });
+  lines.push('');
+
+  // ----- Decision table -----
+  const headers = ['#'];
+  data.columns.forEach((col, i) => {
+    if (!col) { headers.push(`C${i + 1}`); return; }
+    const info = describeColumn(col);
+    headers.push(info.shortTitle);
+  });
+  headers.push('Result');
+
+  // Detect common asset prefix to optionally strip — only over real asset names,
+  // never over NestedChooser references (those are sibling-table names, not paths).
+  let commonPrefix = '';
+  if (opts.shortAssets) {
+    const names = Object.values(data.results)
+      .filter(r => r && r.asset && r.type !== 'NestedChooser')
+      .map(r => r.asset);
+    commonPrefix = longestCommonPrefix(names);
+    if (commonPrefix.length < 3) commonPrefix = '';
+    else {
+      const lastUnder = commonPrefix.lastIndexOf('_');
+      commonPrefix = lastUnder > 0 ? commonPrefix.slice(0, lastUnder + 1) : '';
+    }
+  }
+
+  const renderResult = (result) => {
+    if (!result || !result.asset) return '—';
+    if (result.type === 'NestedChooser') return `→ ${result.asset}`;
+    return stripPrefix(result.asset, commonPrefix);
+  };
+
+  const tableRows = [];
+  for (let r = 0; r < data.rowCount; r++) {
+    const isDisabled = data.disabledRows[r] === true;
+    if (isDisabled && !opts.showDisabled) continue;
+
+    const row = [String(r)];
+    data.columns.forEach(col => {
+      if (!col) { row.push('—'); return; }
+      row.push(formatColumnRow(col, r, opts));
+    });
+
+    const result = data.results[r];
+    let resultCell;
+    if (isDisabled) {
+      resultCell = '[DISABLED]';
+      if (result && result.asset) resultCell += ` (was: ${renderResult(result)})`;
+    } else {
+      resultCell = renderResult(result);
+    }
+    row.push(resultCell);
+    tableRows.push(row);
+  }
+
+  if (commonPrefix) {
+    lines.push(`# Result asset prefix stripped: "${commonPrefix}"`);
+    lines.push('');
+  }
+
+  lines.push(renderMarkdownTable(headers, tableRows));
+
+  return lines.join('\n');
+}
+
+function isOutputColumn(col) {
+  return col && col.type && col.type.startsWith('Output');
+}
+
+function describeColumn(col) {
+  const inputName = parseInputBindingName(col.props.InputValue);
+  if (col.type === 'FloatRangeColumn') {
+    const minV = col.props.MinValue, maxV = col.props.MaxValue;
+    const extra = (minV !== undefined && maxV !== undefined) ? `range ${fmtNum(minV)}..${fmtNum(maxV)}` : '';
+    return {
+      title: inputName,
+      shortTitle: shortenName(inputName),
+      typeLabel: 'FloatRange',
+      extra,
+    };
+  }
+  if (col.type === 'EnumColumn') {
+    const enumName = parseEnumNameFromInput(col.props.InputValue);
+    return {
+      title: inputName,
+      shortTitle: shortenName(inputName),
+      typeLabel: enumName ? `Enum: ${enumName}` : 'Enum',
+    };
+  }
+  if (col.type === 'MultiEnumColumn') {
+    const enumName = parseEnumNameFromInput(col.props.InputValue);
+    return {
+      title: inputName,
+      shortTitle: shortenName(inputName),
+      typeLabel: enumName ? `MultiEnum: ${enumName}` : 'MultiEnum',
+      extra: 'bitmask of enum values',
+    };
+  }
+  if (col.type === 'BoolColumn') {
+    return { title: inputName, shortTitle: shortenName(inputName), typeLabel: 'Bool' };
+  }
+  if (col.type === 'GameplayTagColumn') {
+    return { title: inputName, shortTitle: shortenName(inputName), typeLabel: 'GameplayTag' };
+  }
+  if (col.type === 'StructColumn') {
+    return { title: inputName, shortTitle: shortenName(inputName), typeLabel: 'Struct' };
+  }
+  if (col.type === 'OutputStructColumn') {
+    const def = col.props.DefaultRowValue ? parseStructValue(col.props.DefaultRowValue) : null;
+    const defaultLine = def ? formatStructProps(def.props, null, false) : null;
+    return {
+      title: inputName || 'Output',
+      shortTitle: 'Output',
+      typeLabel: 'OutputStruct',
+      defaultLine,
+    };
+  }
+  if (col.type === 'OutputFloatColumn') {
+    return { title: inputName || 'Output', shortTitle: 'Out:Float', typeLabel: 'OutputFloat' };
+  }
+  if (col.type === 'OutputBoolColumn') {
+    return { title: inputName || 'Output', shortTitle: 'Out:Bool', typeLabel: 'OutputBool' };
+  }
+  if (col.type === 'OutputObjectColumn') {
+    return { title: inputName || 'Output', shortTitle: 'Out:Obj', typeLabel: 'OutputObject' };
+  }
+  return { title: inputName || col.type, shortTitle: col.type, typeLabel: col.type };
+}
+
+function parseInputBindingName(val) {
+  if (!val) return '?';
+  const dn = val.match(/DisplayName="([^"]+)"/);
+  if (dn) return dn[1];
+  const chain = val.match(/PropertyBindingChain=\(([^)]+)\)/);
+  if (chain) {
+    return chain[1].split(',').map(s => s.replace(/"/g, '').trim()).filter(Boolean).join('.');
+  }
+  return '?';
+}
+
+function parseEnumNameFromInput(val) {
+  if (!val) return null;
+  const m = val.match(/Enum="[^']+'([^']+)'"/);
+  return m ? m[1].split('.').pop() : null;
+}
+
+function shortenName(name) {
+  if (!name) return '?';
+  return name.replace(/^CPP[\s_]+/i, '').replace(/^Get_/, '');
+}
+
+function stripPrefix(s, prefix) {
+  if (prefix && s.startsWith(prefix)) return s.slice(prefix.length);
+  return s;
+}
+
+function longestCommonPrefix(arr) {
+  if (!arr.length) return '';
+  let prefix = arr[0];
+  for (let i = 1; i < arr.length; i++) {
+    while (arr[i].indexOf(prefix) !== 0) {
+      prefix = prefix.slice(0, -1);
+      if (!prefix) return '';
+    }
+  }
+  return prefix;
+}
+
+function formatColumnRow(col, rowIdx, opts) {
+  if (!col._rowCache) {
+    col._rowCache = parseRowValuesArray(getColumnRowValuesString(col));
+  }
+  const raw = col._rowCache[rowIdx];
+  if (raw === undefined) return '—';
+
+  if (col.type === 'FloatRangeColumn') return formatFloatRangeRow(raw);
+  if (col.type === 'EnumColumn') return formatEnumRow(raw);
+  if (col.type === 'MultiEnumColumn') return formatMultiEnumRow(raw);
+  if (col.type === 'BoolColumn') return formatBoolRow(raw);
+  if (col.type === 'OutputStructColumn') {
+    if (col._defaultStruct === undefined) {
+      const def = col.props.DefaultRowValue ? parseStructValue(col.props.DefaultRowValue) : null;
+      col._defaultStruct = def ? def.props : null;
+    }
+    return formatOutputStructRow(raw, opts.dropDefaults ? col._defaultStruct : null);
+  }
+  if (col.type === 'OutputFloatColumn' || col.type === 'OutputBoolColumn' || col.type === 'OutputObjectColumn') {
+    return shortenValue(raw);
+  }
+  return raw.length > 60 ? raw.slice(0, 57) + '...' : raw;
+}
+
+function formatFloatRangeRow(raw) {
+  const inner = raw.replace(/^\(/, '').replace(/\)$/, '').trim();
+  if (!inner) return '—';
+  const props = parseStructProps(inner);
+  const noMin = props.bNoMin === 'True';
+  const noMax = props.bNoMax === 'True';
+  const minSet = 'Min' in props;
+  const maxSet = 'Max' in props;
+  const min = minSet ? parseFloat(props.Min) : 0;
+  const max = maxSet ? parseFloat(props.Max) : 0;
+
+  if (noMin && noMax) return '(any)';
+  if (noMin) return `≤ ${fmtNum(max)}`;
+  if (noMax) return `≥ ${fmtNum(min)}`;
+  return `${fmtNum(min)}..${fmtNum(max)}`;
+}
+
+function formatEnumRow(raw) {
+  const inner = raw.replace(/^\(/, '').replace(/\)$/, '').trim();
+  if (!inner) return '—';
+  const props = parseStructProps(inner);
+  const valName = props.ValueName ? stripQuotes(props.ValueName) : '';
+  const enumVal = valName.includes('::') ? valName.split('::').pop() : valName;
+  const cmp = props.Comparison || 'MatchEqual';
+  if (cmp === 'MatchAny') return enumVal ? `(any) /*${enumVal}*/` : '(any)';
+  if (!enumVal) return '—';
+  if (cmp === 'MatchNotEqual') return `≠ ${enumVal}`;
+  if (cmp === 'MatchEqual') return `= ${enumVal}`;
+  return `${cmp} ${enumVal}`;
+}
+
+function formatMultiEnumRow(raw) {
+  // RowValues entries look like (Value=16) or () — Value is a bitmask of selected enum values.
+  // Default Value=0 (none selected) means "matches anything" in chooser semantics.
+  const inner = raw.replace(/^\(/, '').replace(/\)$/, '').trim();
+  if (!inner) return '(any)';
+  const props = parseStructProps(inner);
+  const v = (props.Value || '').trim();
+  if (!v || v === '0') return '(any)';
+  return `=${v}`;
+}
+
+function formatBoolRow(raw) {
+  if (!raw) return '—';
+  const v = raw.trim();
+  // Modern format: bare tokens from RowValuesWithAny.
+  if (v === 'MatchAny') return '(any)';
+  if (v === 'MatchTrue') return 'T';
+  if (v === 'MatchFalse') return 'F';
+  // Older struct form, e.g. (Value=True,Comparison=MatchEqual) — keep as fallback.
+  if (v.startsWith('(')) {
+    const inner = v.replace(/^\(/, '').replace(/\)$/, '').trim();
+    if (!inner) return '—';
+    const props = parseStructProps(inner);
+    if ((props.Comparison || '') === 'MatchAny') return '(any)';
+    const sv = (props.Value || props.TestValue || '').trim();
+    if (!sv) return '—';
+    return shortenValue(sv);
+  }
+  return v;
+}
+
+function formatOutputStructRow(raw, defaultProps) {
+  const sv = parseStructValue(raw);
+  if (!sv) return raw.length > 60 ? raw.slice(0, 57) + '...' : raw;
+  return formatStructProps(sv.props, defaultProps, true);
+}
+
+function formatStructProps(props, defaultProps, dropEmptyStrings) {
+  const parts = [];
+  for (const [k, v] of Object.entries(props)) {
+    if (defaultProps && String(defaultProps[k]) === String(v)) continue;
+    if (dropEmptyStrings && (v === '""' || v === '')) continue;
+    parts.push(`${k}=${shortenValue(v)}`);
+  }
+  return parts.length ? parts.join(' ') : '(default)';
+}
+
+function shortenValue(v) {
+  if (v === undefined || v === null) return '?';
+  v = String(v);
+  if (v === 'True') return 'T';
+  if (v === 'False') return 'F';
+  if (/^-?\d+(\.\d+)?$/.test(v)) return fmtNum(v);
+  if (v.startsWith('"') && v.endsWith('"')) {
+    const inner = v.slice(1, -1);
+    return inner === '' ? '""' : inner;
+  }
+  return v;
+}
+
+function fmtNum(s) {
+  const n = parseFloat(s);
+  if (isNaN(n)) return String(s);
+  if (n === 0) return '0';
+  return parseFloat(n.toFixed(6)).toString();
+}
+
+function renderMarkdownTable(headers, rows) {
+  const widths = headers.map((h, i) => {
+    let w = String(h).length;
+    for (const r of rows) {
+      const cell = r[i] !== undefined ? String(r[i]) : '';
+      if (cell.length > w) w = cell.length;
+    }
+    return w;
+  });
+  const fmtRow = arr => '| ' + arr.map((c, i) => String(c !== undefined ? c : '').padEnd(widths[i])).join(' | ') + ' |';
+  const sep = '|' + widths.map(w => '-'.repeat(w + 2)).join('|') + '|';
+  return [fmtRow(headers), sep, ...rows.map(fmtRow)].join('\n');
+}
+
+// ===== UI wiring: Blueprint tab =====
 
 const inputEl = document.getElementById('input');
 const outputEl = document.getElementById('output');
@@ -441,6 +1307,15 @@ document.getElementById('optimizeBtn').addEventListener('click', () => {
     dropDefaults: document.getElementById('dropDefaults').checked,
     shortIds: document.getElementById('shortIds').checked,
   };
+  clearWarnings();
+  // Pasted a Chooser Table by mistake? Send the user to the right tab instead of
+  // running it through the Blueprint parser (which would warn on every chooser block).
+  if (/Begin\s+Object\s+Class=\/Script\/Chooser\.ChooserTable\b/.test(inputEl.value)) {
+    outputEl.value = '// This looks like a Chooser Table.\n// Switch to the "Chooser Table" tab to optimize it.';
+    renderLog();
+    updateStats();
+    return;
+  }
   try {
     const nodes = parseBlueprint(inputEl.value);
     if (nodes.length === 0) {
@@ -450,13 +1325,17 @@ document.getElementById('optimizeBtn').addEventListener('click', () => {
     }
   } catch (e) {
     outputEl.value = '// Error: ' + e.message;
+    logWarning('exception', 'Parser/optimizer threw an error', e.message);
   }
+  renderLog();
   updateStats();
 });
 
 document.getElementById('clearBtn').addEventListener('click', () => {
   inputEl.value = '';
   outputEl.value = '';
+  clearWarnings();
+  renderLog();
   updateStats();
 });
 
@@ -470,6 +1349,115 @@ document.getElementById('loadExample').addEventListener('click', () => {
   updateStats();
   document.getElementById('optimizeBtn').click();
 });
+
+// ===== UI wiring: Chooser Table tab =====
+
+const ctblInputEl = document.getElementById('ctblInput');
+const ctblOutputEl = document.getElementById('ctblOutput');
+const ctblInStat = document.getElementById('ctblInStat');
+const ctblOutStat = document.getElementById('ctblOutStat');
+
+function updateChooserStats() {
+  const inLen = ctblInputEl.value.length;
+  const outLen = ctblOutputEl.value.length;
+  ctblInStat.textContent = `${inLen.toLocaleString()} chars`;
+  if (outLen > 0 && inLen > 0) {
+    const pct = ((1 - outLen / inLen) * 100).toFixed(1);
+    ctblOutStat.textContent = `${outLen.toLocaleString()} chars  (${pct >= 0 ? '-' : '+'}${Math.abs(pct)}%)`;
+    ctblOutStat.classList.toggle('warn', pct < 30);
+  } else {
+    ctblOutStat.textContent = '—';
+  }
+}
+
+ctblInputEl.addEventListener('input', updateChooserStats);
+
+document.getElementById('ctblOptimizeBtn').addEventListener('click', () => {
+  const opts = {
+    dropDefaults: document.getElementById('ctblDropDefaults').checked,
+    shortAssets: document.getElementById('ctblShortAssets').checked,
+    showDisabled: document.getElementById('ctblShowDisabled').checked,
+  };
+  try {
+    ctblOutputEl.value = optimizeChooserTable(ctblInputEl.value, opts);
+  } catch (e) {
+    ctblOutputEl.value = '// Error: ' + e.message;
+    logWarning('exception', 'Chooser parser/optimizer threw an error', e.message);
+  }
+  renderLog();
+  updateChooserStats();
+});
+
+document.getElementById('ctblClearBtn').addEventListener('click', () => {
+  ctblInputEl.value = '';
+  ctblOutputEl.value = '';
+  clearWarnings();
+  renderLog();
+  updateChooserStats();
+});
+
+document.getElementById('ctblCopyBtn').addEventListener('click', () => {
+  ctblOutputEl.select();
+  document.execCommand('copy');
+});
+
+document.getElementById('ctblLoadExample').addEventListener('click', () => {
+  ctblInputEl.value = CHOOSER_EXAMPLE_TEXT;
+  updateChooserStats();
+  document.getElementById('ctblOptimizeBtn').click();
+});
+
+// ===== Tab switching =====
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const target = tab.dataset.tab;
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === tab));
+    document.querySelectorAll('.tab-panel').forEach(p => {
+      p.hidden = p.dataset.tab !== target;
+    });
+  });
+});
+
+// ===== Log panel =====
+
+const logSection = document.getElementById('logSection');
+const logCountEl = document.getElementById('logCount');
+const logBodyEl = document.getElementById('logBody');
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+function renderLog() {
+  logCountEl.textContent = warnings.length;
+  logCountEl.classList.toggle('has-warnings', warnings.length > 0);
+
+  if (warnings.length === 0) {
+    logBodyEl.innerHTML = '<div class="log-empty">No unknown conventions encountered.</div>';
+    return;
+  }
+
+  logBodyEl.innerHTML = warnings.map(w => `
+    <div class="log-entry">
+      <span class="log-type">[${escapeHtml(w.type)}]</span><span class="log-msg">${escapeHtml(w.message)}</span>
+      ${w.sample ? `<span class="log-sample">${escapeHtml(w.sample)}</span>` : ''}
+    </div>
+  `).join('');
+
+  logSection.classList.add('open');
+
+  console.warn(`[BP Optimizer] ${warnings.length} unknown convention(s) encountered:`);
+  warnings.forEach(w => console.warn(`  [${w.type}] ${w.message}${w.sample ? ' — ' + w.sample : ''}`));
+}
+
+document.getElementById('logToggle').addEventListener('click', () => {
+  logSection.classList.toggle('open');
+});
+
+// ===== Examples =====
 
 const EXAMPLE_TEXT = `Begin Object Class=/Script/BlueprintGraph.K2Node_FunctionEntry Name="K2Node_FunctionEntry_0"
    FunctionReference=(MemberParent="/Script/CoreUObject.Class'/Script/CharacterCustomizer.BPI_SandboxCharacterPawn'",MemberName="Get_PropertiesForCamera")
@@ -487,7 +1475,50 @@ Begin Object Class=/Script/BlueprintGraph.K2Node_VariableGet Name="K2Node_Variab
    CustomProperties Pin (PinId=D69100BB24264BD6990D59CB3F620116,PinName="then",PinFriendlyName="Is Valid",Direction="EGPD_Output",PinType.PinCategory="exec",LinkedTo=(K2Node_FunctionResult_0 3151D2967FC042848DF941A3F0A35898,),)
 End Object`;
 
+const CHOOSER_EXAMPLE_TEXT = `Begin Object Class=/Script/Chooser.ChooserTable Name="ChooserTable_1" ExportPath="/Script/Chooser.ChooserTable'/Engine/Transient.ChooserTable_1'"
+   ResultsStructs(0)=/Script/Chooser.AssetChooser(Asset="/Script/Engine.AnimSequence'/Game/Characters/UEFN_Mannequin/Animations/Jump/M_Relaxed_Jump_F_Start_Walk_Lfoot.M_Relaxed_Jump_F_Start_Walk_Lfoot'")
+   ResultsStructs(1)=/Script/Chooser.AssetChooser(Asset="/Script/Engine.AnimSequence'/Game/Characters/UEFN_Mannequin/Animations/Jump/M_Relaxed_Jump_F_Start_Walk_Rfoot.M_Relaxed_Jump_F_Start_Walk_Rfoot'")
+   ResultsStructs(3)=/Script/Chooser.AssetChooser(Asset="/Script/Engine.AnimSequence'/Game/Characters/UEFN_Mannequin/Animations/Jump/M_Relaxed_Jump_F_Start_Run_Lfoot.M_Relaxed_Jump_F_Start_Run_Lfoot'")
+   ResultsStructs(4)=/Script/Chooser.AssetChooser(Asset="/Script/Engine.AnimSequence'/Game/Characters/UEFN_Mannequin/Animations/Jump/M_Relaxed_Jump_F_Start_Run_Rfoot.M_Relaxed_Jump_F_Start_Run_Rfoot'")
+   ResultsStructs(6)=/Script/Chooser.AssetChooser(Asset="/Script/Engine.AnimSequence'/Game/Characters/UEFN_Mannequin/Animations/Jump/M_Relaxed_Jump_F_Start_Sprint_Lfoot.M_Relaxed_Jump_F_Start_Sprint_Lfoot'")
+   ResultsStructs(7)=/Script/Chooser.AssetChooser(Asset="/Script/Engine.AnimSequence'/Game/Characters/UEFN_Mannequin/Animations/Jump/M_Relaxed_Jump_F_Start_Sprint_Rfoot.M_Relaxed_Jump_F_Start_Sprint_Rfoot'")
+   ResultsStructs(9)=/Script/Chooser.AssetChooser(Asset="/Script/Engine.AnimSequence'/Game/Characters/UEFN_Mannequin/Animations/Jump/M_Neutral_Jump_F_Off_Walk_Lfoot.M_Neutral_Jump_F_Off_Walk_Lfoot'")
+   ResultsStructs(10)=/Script/Chooser.AssetChooser(Asset="/Script/Engine.AnimSequence'/Game/Characters/UEFN_Mannequin/Animations/Jump/M_Neutral_Jump_F_Off_Walk_Rfoot.M_Neutral_Jump_F_Off_Walk_Rfoot'")
+   ResultsStructs(11)=/Script/Chooser.AssetChooser(Asset="/Script/Engine.AnimSequence'/Game/Characters/UEFN_Mannequin/Animations/Jump/M_Neutral_Jump_F_Off_Run_Rfoot.M_Neutral_Jump_F_Off_Run_Rfoot'")
+   ResultsStructs(12)=/Script/Chooser.AssetChooser(Asset="/Script/Engine.AnimSequence'/Game/Characters/UEFN_Mannequin/Animations/Jump/M_Neutral_Jump_F_Off_Run_Lfoot.M_Neutral_Jump_F_Off_Run_Lfoot'")
+   ResultsStructs(14)=/Script/Chooser.AssetChooser(Asset="/Script/Engine.AnimSequence'/Game/Characters/UEFN_Mannequin/Animations/Jump/M_Neutral_Jump_F_Off_Walk_Lfoot.M_Neutral_Jump_F_Off_Walk_Lfoot'")
+   ResultsStructs(15)=/Script/Chooser.AssetChooser(Asset="/Script/Engine.AnimSequence'/Game/Characters/UEFN_Mannequin/Animations/Jump/M_Neutral_Jump_F_Off_Walk_Rfoot.M_Neutral_Jump_F_Off_Walk_Rfoot'")
+   ResultsStructs(16)=/Script/Chooser.AssetChooser(Asset="/Script/Engine.AnimSequence'/Game/Characters/UEFN_Mannequin/Animations/Jump/M_Neutral_Jump_F_Off_Run_Rfoot.M_Neutral_Jump_F_Off_Run_Rfoot'")
+   ResultsStructs(17)=/Script/Chooser.AssetChooser(Asset="/Script/Engine.AnimSequence'/Game/Characters/UEFN_Mannequin/Animations/Jump/M_Neutral_Jump_F_Off_Run_Lfoot.M_Neutral_Jump_F_Off_Run_Lfoot'")
+   DisabledRows(0)=False
+   DisabledRows(1)=False
+   DisabledRows(2)=True
+   DisabledRows(3)=False
+   DisabledRows(4)=False
+   DisabledRows(5)=True
+   DisabledRows(6)=False
+   DisabledRows(7)=False
+   DisabledRows(8)=True
+   DisabledRows(9)=False
+   DisabledRows(10)=False
+   DisabledRows(11)=False
+   DisabledRows(12)=False
+   DisabledRows(13)=True
+   DisabledRows(14)=False
+   DisabledRows(15)=False
+   DisabledRows(16)=False
+   DisabledRows(17)=False
+   ColumnsStructs(0)=/Script/Chooser.FloatRangeColumn(InputValue=/Script/Chooser.FloatContextProperty(Binding=(PropertyBindingChain=("CPP_Velocity","Z"),ContextIndex=0,IsBoundToRoot=False,DisplayName="CPP Velocity.Z")),bWrapInput=False,MinValue=-180.000000,MaxValue=180.000000,DefaultRowValue=(Min=0.000000,Max=0.000000,bNoMin=False,bNoMax=False),RowValues=((Min=10.000000,bNoMax=True),(Min=10.000000,bNoMax=True),(),(Min=10.000000,bNoMax=True),(Min=10.000000,bNoMax=True),(),(Min=10.000000,bNoMax=True),(Min=10.000000,bNoMax=True),(),(Min=-100.000000,Max=10.000000,bNoMin=True),(Min=-100.000000,Max=10.000000,bNoMin=True),(Min=-100.000000,Max=10.000000,bNoMin=True),(Min=-100.000000,Max=10.000000,bNoMin=True),(),(Max=10.000000,bNoMin=True,bNoMax=True),(Max=10.000000,bNoMin=True,bNoMax=True),(Max=10.000000,bNoMin=True,bNoMax=True),(Max=10.000000,bNoMin=True,bNoMax=True)),bDisabled=False,EditorColumnWidth=200.000000)
+   ColumnsStructs(1)=/Script/Chooser.FloatRangeColumn(InputValue=/Script/Chooser.FloatContextProperty(Binding=(PropertyBindingChain=("CPP_Speed2D"),ContextIndex=0,IsBoundToRoot=False,DisplayName="CPP Speed 2D")),bWrapInput=False,MinValue=-180.000000,MaxValue=180.000000,DefaultRowValue=(Min=0.000000,Max=0.000000,bNoMin=False,bNoMax=False),RowValues=((Max=200.000000),(Max=200.000000),(),(Min=200.000000,Max=400.000000),(Min=200.000000,Max=400.000000),(),(Min=400.000000,bNoMax=True),(Min=400.000000,bNoMax=True),(),(Max=200.000000),(Max=200.000000),(Min=200.000000,bNoMax=True),(Min=200.000000,bNoMax=True),(),(Max=200.000000),(Max=200.000000),(Min=200.000000,bNoMax=True),(Min=200.000000,bNoMax=True)),bDisabled=False,EditorColumnWidth=200.000000)
+   ColumnsStructs(2)=/Script/Chooser.EnumColumn(InputValue=/Script/Chooser.EnumContextProperty(Binding=(Enum="/Script/CoreUObject.Enum'/Script/CharacterCustomizer.ECharacterMovementMode'",PropertyBindingChain=("CPP_MovementModeLastFrame"),ContextIndex=0,IsBoundToRoot=False,DisplayName="CPP Movement Mode Last Frame")),DefaultRowValue=(ValueName="",Comparison=MatchEqual,Value=0),RowValues=((ValueName="ECharacterMovementMode::InAir",Comparison=MatchNotEqual,Value=1),(ValueName="ECharacterMovementMode::InAir",Comparison=MatchNotEqual,Value=1),(ValueName="ECharacterMovementMode::OnGround",Comparison=MatchAny),(ValueName="ECharacterMovementMode::InAir",Comparison=MatchNotEqual,Value=1),(ValueName="ECharacterMovementMode::InAir",Comparison=MatchNotEqual,Value=1),(ValueName="ECharacterMovementMode::OnGround"),(ValueName="ECharacterMovementMode::InAir",Comparison=MatchNotEqual,Value=1),(ValueName="ECharacterMovementMode::InAir",Comparison=MatchNotEqual,Value=1),(ValueName="ECharacterMovementMode::OnGround"),(ValueName="ECharacterMovementMode::InAir",Comparison=MatchNotEqual,Value=1),(ValueName="ECharacterMovementMode::InAir",Comparison=MatchNotEqual,Value=1),(ValueName="ECharacterMovementMode::InAir",Comparison=MatchNotEqual,Value=1),(ValueName="ECharacterMovementMode::InAir",Comparison=MatchNotEqual,Value=1),(ValueName="ECharacterMovementMode::OnGround"),(ValueName="ECharacterMovementMode::InAir",Value=1),(ValueName="ECharacterMovementMode::InAir",Value=1),(ValueName="ECharacterMovementMode::InAir",Value=1),(ValueName="ECharacterMovementMode::InAir",Value=1)),bDisabled=False,EditorColumnWidth=200.000000)
+   ColumnsStructs(3)=/Script/Chooser.OutputStructColumn(InputValue=/Script/Chooser.StructContextProperty(Binding=(StructType="/Script/CoreUObject.ScriptStruct'/Script/CharacterCustomizer.ChooserOutputs'",PropertyBindingChain=,ContextIndex=1,IsBoundToRoot=True,DisplayName="Chooser Outputs")),FallbackValue=/Script/CharacterCustomizer.ChooserOutputs(StartTime=0.000000,UseMM=False,MMCostLimit=0.000000,BlendTime=0.300000,BlendProfile="",Tags=),DefaultRowValue=/Script/CharacterCustomizer.ChooserOutputs(StartTime=0.000000,UseMM=False,MMCostLimit=0.000000,BlendTime=0.300000,BlendProfile="",Tags=),RowValues=(/Script/CharacterCustomizer.ChooserOutputs(StartTime=0.000000,UseMM=True,MMCostLimit=0.000000,BlendTime=0.200000,BlendProfile="FastFeet_FastRoot",Tags=),/Script/CharacterCustomizer.ChooserOutputs(StartTime=0.000000,UseMM=True,MMCostLimit=0.000000,BlendTime=0.200000,BlendProfile="FastFeet_FastRoot",Tags=),/Script/CharacterCustomizer.ChooserOutputs(StartTime=0.000000,UseMM=False,MMCostLimit=0.000000,BlendTime=0.300000,BlendProfile="",Tags=),/Script/CharacterCustomizer.ChooserOutputs(StartTime=0.000000,UseMM=True,MMCostLimit=0.000000,BlendTime=0.200000,BlendProfile="FastFeet_FastRoot",Tags=),/Script/CharacterCustomizer.ChooserOutputs(StartTime=0.000000,UseMM=True,MMCostLimit=0.000000,BlendTime=0.200000,BlendProfile="FastFeet_FastRoot",Tags=),/Script/CharacterCustomizer.ChooserOutputs(StartTime=0.000000,UseMM=False,MMCostLimit=0.000000,BlendTime=0.300000,BlendProfile="",Tags=),/Script/CharacterCustomizer.ChooserOutputs(StartTime=0.000000,UseMM=True,MMCostLimit=0.000000,BlendTime=0.200000,BlendProfile="FastFeet_FastRoot",Tags=),/Script/CharacterCustomizer.ChooserOutputs(StartTime=0.000000,UseMM=True,MMCostLimit=0.000000,BlendTime=0.200000,BlendProfile="FastFeet_FastRoot",Tags=),/Script/CharacterCustomizer.ChooserOutputs(StartTime=0.000000,UseMM=False,MMCostLimit=0.000000,BlendTime=0.300000,BlendProfile="",Tags=),/Script/CharacterCustomizer.ChooserOutputs(StartTime=0.000000,UseMM=True,MMCostLimit=0.000000,BlendTime=0.300000,BlendProfile="",Tags=),/Script/CharacterCustomizer.ChooserOutputs(StartTime=0.000000,UseMM=True,MMCostLimit=0.000000,BlendTime=0.300000,BlendProfile="",Tags=),/Script/CharacterCustomizer.ChooserOutputs(StartTime=0.000000,UseMM=True,MMCostLimit=0.000000,BlendTime=0.300000,BlendProfile="",Tags=),/Script/CharacterCustomizer.ChooserOutputs(StartTime=0.000000,UseMM=True,MMCostLimit=0.000000,BlendTime=0.300000,BlendProfile="",Tags=),/Script/CharacterCustomizer.ChooserOutputs(StartTime=0.000000,UseMM=False,MMCostLimit=0.000000,BlendTime=0.300000,BlendProfile="",Tags=),/Script/CharacterCustomizer.ChooserOutputs(StartTime=0.000000,UseMM=True,MMCostLimit=0.000000,BlendTime=0.400000,BlendProfile="",Tags=),/Script/CharacterCustomizer.ChooserOutputs(StartTime=0.000000,UseMM=True,MMCostLimit=0.000000,BlendTime=0.400000,BlendProfile="",Tags=),/Script/CharacterCustomizer.ChooserOutputs(StartTime=0.000000,UseMM=True,MMCostLimit=0.000000,BlendTime=0.400000,BlendProfile="",Tags=),/Script/CharacterCustomizer.ChooserOutputs(StartTime=0.000000,UseMM=True,MMCostLimit=0.000000,BlendTime=0.400000,BlendProfile="",Tags=)),bDisabled=False,EditorColumnWidth=200.000000)
+   OutputObjectType="/Script/CoreUObject.Class'/Script/Engine.AnimationAsset'"
+   ContextData(0)=/Script/Chooser.ContextObjectTypeClass(Class="/Script/Engine.AnimBlueprintGeneratedClass'/Game/Blueprints/PORLCharacter_Mover_ABP.PORLCharacter_Mover_ABP_C'",Direction=ReadWrite)
+   ContextData(1)=/Script/Chooser.ContextObjectTypeStruct(Struct="/Script/CoreUObject.ScriptStruct'/Script/CharacterCustomizer.ChooserOutputs'",Direction=Write)
+End Object`;
+
 updateStats();
+updateChooserStats();
 </script>
 
 </body>
