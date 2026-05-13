@@ -222,6 +222,7 @@
   <nav class="tabs">
     <button class="tab active" data-tab="bp">Blueprint</button>
     <button class="tab" data-tab="chooser">Chooser Table</button>
+    <button class="tab" data-tab="statetree">State Tree</button>
   </nav>
 </header>
 
@@ -291,6 +292,39 @@
         <span class="stat" id="ctblOutStat">—</span>
       </div>
       <textarea id="ctblOutput" placeholder="Optimized decision table appears here..." spellcheck="false"></textarea>
+    </section>
+  </main>
+</div>
+
+<!-- ========== TAB 3: State Tree ========== -->
+<div class="tab-panel" data-tab="statetree" hidden>
+  <div class="tab-header">
+    <div>
+      <h1>State Tree → Token Optimizer</h1>
+      <div class="sub">Paste UE State Tree behavior copy-paste text. Get compact hierarchical view for AI analysis.</div>
+    </div>
+    <div class="controls">
+      <label class="toggle"><input type="checkbox" id="stShowBindings" checked> show bindings</label>
+      <button id="stLoadExample">Load Example</button>
+      <button id="stClearBtn">Clear</button>
+      <button id="stCopyBtn">Copy Output</button>
+      <button class="primary" id="stOptimizeBtn">Optimize ▶</button>
+    </div>
+  </div>
+  <main>
+    <section class="pane">
+      <div class="pane-head">
+        <span>INPUT — State Tree Text</span>
+        <span class="stat" id="stInStat">0 chars</span>
+      </div>
+      <textarea id="stInput" placeholder="Paste State Tree text here (Begin Object Class=...StateTreeState ... End Object)..." spellcheck="false"></textarea>
+    </section>
+    <section class="pane">
+      <div class="pane-head">
+        <span>OUTPUT — Compact Tree</span>
+        <span class="stat" id="stOutStat">—</span>
+      </div>
+      <textarea id="stOutput" placeholder="Optimized state tree appears here..." spellcheck="false"></textarea>
     </section>
   </main>
 </div>
@@ -1279,6 +1313,289 @@ function renderMarkdownTable(headers, rows) {
   return [fmtRow(headers), sep, ...rows.map(fmtRow)].join('\n');
 }
 
+// ===== State Tree parser =====
+
+function parseSTBlocks(text) {
+  const lines = text.split(/\r?\n/);
+  let pos = 0;
+  function parse() {
+    const h = lines[pos++].trim();
+    const cm = h.match(/Class=(\S+)/);
+    const nm = h.match(/Name="([^"]+)"/);
+    const ep = h.match(/ExportPath="([^"]+)"/);
+    const b = { hasClass: !!cm, className: cm ? cm[1] : '', objName: nm ? nm[1] : '',
+                exportPath: ep ? ep[1] : '', props: {}, subBlocks: [] };
+    while (pos < lines.length) {
+      const l = lines[pos].trim();
+      if (/^End\s+Object/.test(l)) { pos++; break; }
+      if (/^Begin\s+Object/.test(l)) { b.subBlocks.push(parse()); continue; }
+      const eq = l.indexOf('=');
+      if (eq > 0) {
+        const k = l.slice(0, eq).trim(), v = l.slice(eq + 1).trim();
+        const im = k.match(/^(\w+)\((\d+)\)$/);
+        if (im) {
+          if (!Array.isArray(b.props[im[1]])) b.props[im[1]] = [];
+          b.props[im[1]][+im[2]] = v;
+        } else {
+          b.props[k] = v;
+        }
+      }
+      pos++;
+    }
+    return b;
+  }
+  const out = [];
+  while (pos < lines.length) {
+    if (/^\s*Begin\s+Object/.test(lines[pos])) out.push(parse());
+    else pos++;
+  }
+  return out;
+}
+
+function isStateTreeInput(text) {
+  return /StateTreeEditorModule\.StateTreeState|StateTreeClipboardBindings/.test(text);
+}
+
+function buildSTTree(blocks) {
+  let root = null, bindings = [], treeName = '';
+  for (const b of blocks) {
+    if (b.className.includes('StateTreeClipboardBindings')) {
+      bindings = (b.props.Bindings || []).map(parseSTBinding);
+    } else {
+      root = extractSTState(b);
+      const ep = b.exportPath || '';
+      const m = ep.match(/\/([^/.']+)\.\1/);
+      if (m) treeName = m[1];
+    }
+  }
+  return { root, bindings, treeName };
+}
+
+function extractSTState(block) {
+  const st = {
+    name: block.props.Name ? stripQuotes(block.props.Name) : '',
+    tasks: (block.props.Tasks || []).filter(t => t && t !== '()'),
+    transitions: block.props.Transitions || [],
+    enterConditions: block.props.EnterConditions || [],
+    considerations: block.props.Considerations || [],
+    requiredEvent: block.props.RequiredEventToEnter || '',
+    selectionBehavior: block.props.SelectionBehavior || '',
+    children: [],
+    instanceObjects: {}
+  };
+  for (const sub of block.subBlocks) {
+    if (sub.hasClass) continue;
+    if (sub.props.ID) st.children.push(extractSTState(sub));
+    else if (Object.keys(sub.props).length > 0)
+      st.instanceObjects[sub.objName] = sub.props;
+  }
+  return st;
+}
+
+function parseSTBinding(str) {
+  const srcNames = [], tgtNames = [];
+  const halves = str.split('TargetPropertyPath=');
+  if (halves.length >= 2) {
+    (halves[0].match(/Name="([^"]+)"/g) || []).forEach(m => srcNames.push(m.match(/"([^"]+)"/)[1]));
+    (halves[1].match(/Name="([^"]+)"/g) || []).forEach(m => tgtNames.push(m.match(/"([^"]+)"/)[1]));
+  }
+  return { source: srcNames.join('.'), target: tgtNames.join('.') };
+}
+
+function extractBalanced(str, fromIdx) {
+  let start = str.indexOf('(', fromIdx);
+  if (start < 0) return '';
+  let depth = 1, i = start + 1;
+  while (i < str.length && depth > 0) {
+    if (str[i] === '(') depth++;
+    else if (str[i] === ')') depth--;
+    else if (str[i] === '"') { i++; while (i < str.length && str[i] !== '"') i++; }
+    i++;
+  }
+  return str.slice(start + 1, i - 1);
+}
+
+function fmtSTTask(taskStr, instanceObjs) {
+  if (!taskStr || taskStr === '()') return null;
+  let name = '?';
+  const wrap = taskStr.match(/TaskClass="[^']*'[^']*\/([^.']+)\.([^']+)'/);
+  if (wrap) {
+    name = wrap[2].replace(/_C$/, '').replace(/^STT_/, '');
+  } else {
+    const nm = taskStr.match(/Node=\/[^(]+\.(\w+)\(/);
+    if (nm) name = nm[1].replace(/^StateTree/, '').replace(/Task$/, '');
+  }
+
+  const params = [];
+  const instIdx = taskStr.search(/\bInstance=\//);
+  if (instIdx >= 0) {
+    const content = extractBalanced(taskStr, instIdx);
+    const skip = new Set(['bTaskEnabled','TransitionHandlingPriority','bConsideredForCompletion',
+      'bCanEditConsideredForCompletion','BindingsBatch','OutputBindingsBatch','InstanceTemplateIndex',
+      'ExecutionRuntimeTemplateIndex','InstanceDataHandle','bSavedShouldCallTick','AIController',
+      'FilterClass','Name','bRunForever']);
+    const skipVals = new Set(['None','False','Normal','0.000000','','True']);
+    smartSplit(content).forEach(p => {
+      const eq = p.indexOf('=');
+      if (eq > 0) {
+        const k = p.slice(0, eq).trim(), v = p.slice(eq + 1).trim();
+        if (!skip.has(k) && !skipVals.has(v) && !v.startsWith('('))
+          params.push(k + '=' + fmtNum(v));
+      }
+    });
+  }
+
+  const ioMatch = taskStr.match(/InstanceObject="[^']*'([^']+)'/);
+  if (ioMatch && instanceObjs[ioMatch[1]]) {
+    for (const [k, v] of Object.entries(instanceObjs[ioMatch[1]])) {
+      if (v && v !== 'None' && v !== 'False' && v !== '0.000000')
+        params.push(k + '=' + shortenSTValue(v));
+    }
+  }
+
+  if (name === 'Delay') {
+    const dur = params.find(p => p.startsWith('Duration='));
+    const dev = params.find(p => p.startsWith('RandomDeviation='));
+    if (dur) {
+      const d = dur.split('=')[1], r = dev ? dev.split('=')[1] : '0';
+      return 'Delay(' + d + 's' + (r !== '0' ? ' ±' + r + 's' : '') + ')';
+    }
+  }
+  if (name === 'RunEnvQuery') {
+    const q = taskStr.match(/QueryTemplate="[^']*'[^']*\/([^.']+)\.[^']+'/);
+    if (q) return 'RunEnvQuery(' + q[1] + ')';
+  }
+  if (name === 'MoveTo') {
+    const mp = params.filter(p => !p.startsWith('Destination=') && !p.startsWith('TargetActor=')
+      && !p.startsWith('FilterClass=') && !p.startsWith('AIController='));
+    return mp.length ? name + '(' + mp.join(', ') + ')' : name;
+  }
+
+  return params.length ? name + '(' + params.join(', ') + ')' : name;
+}
+
+function fmtSTTransition(transStr) {
+  const trig = transStr.match(/Trigger=(\w+)/);
+  let trigger = trig ? trig[1] : '';
+
+  const nm = transStr.match(/State=\([^)]*Name="([^"]+)"/);
+  const lk = transStr.match(/LinkType=(\w+)/);
+  const target = nm ? nm[1] : '';
+  const link = lk ? lk[1] : '';
+  const disabled = /bTransitionEnabled=False/.test(transStr);
+
+  const ev = transStr.match(/RequiredEvent=\([^)]*TagName="([^"]+)"/);
+  const eventTag = ev ? ev[1].replace('StateTree.', '') : '';
+
+  let condDesc = '';
+  if (/Conditions=\(/.test(transStr)) {
+    const ct = [...transStr.matchAll(/\.(\w+Condition)\(/g)];
+    if (ct.length) condDesc = ct.map(c => c[1].replace('StateTree', '').replace('Condition', '')).join('+');
+  }
+
+  let out = '→ ';
+  if (link === 'NextSelectableState') out += 'next';
+  else if (target) out += target;
+  else out += link || '?';
+
+  const ann = [];
+  if (trigger === 'OnStateSucceeded') ann.push('on success');
+  else if (trigger === 'OnStateFailed') ann.push('on fail');
+  else if (trigger === 'OnEvent') ann.push('on event');
+  if (eventTag) ann.push(eventTag);
+  if (condDesc) ann.push('if ' + condDesc);
+  if (disabled) ann.push('disabled');
+  if (ann.length) out += ' [' + ann.join(', ') + ']';
+  return out;
+}
+
+function fmtSTCondition(condStr) {
+  const nm = condStr.match(/Node=\/[^(]+\.(\w+)\(/);
+  let name = nm ? nm[1].replace('StateTree', '').replace('Condition', '') : '?';
+  const inv = /bInvert=True/.test(condStr);
+  if (name === 'CompareBool') return (inv ? '!' : '') + 'Bool';
+  if (name === 'GameplayTagMatch') {
+    const tag = condStr.match(/TagName="([^"]+)"/);
+    return (inv ? '!' : '') + 'Tag(' + (tag ? tag[1] : '') + ')';
+  }
+  if (name === 'ObjectIsValid') return (inv ? '!' : '') + 'IsValid';
+  return (inv ? '!' : '') + name;
+}
+
+function fmtSTConsideration(consStr) {
+  const m = consStr.match(/ConsiderationClass="[^']*'[^']*\/([^.']+)\.[^']+'/);
+  if (m) return m[1].replace(/_C$/, '');
+  return '?';
+}
+
+function parseSTEventStr(eventStr) {
+  const tag = eventStr.match(/TagName="([^"]+)"/);
+  const payload = eventStr.match(/PayloadStruct="[^']*'[^']*\/([^.']+)\.[^']+'/);
+  let out = tag ? tag[1].replace('StateTree.', '') : '';
+  if (payload) out += ' (' + payload[1] + ')';
+  return out;
+}
+
+function shortenSTValue(v) {
+  const m = v.match(/'[^']*\/([^.']+)\.[^']+'/);
+  return m ? m[1] : fmtNum(v);
+}
+
+// ===== State Tree optimizer =====
+
+function optimizeStateTree(text, opts) {
+  clearWarnings();
+  const blocks = parseSTBlocks(text);
+  if (!blocks.length) return '// No State Tree data found. Paste Begin Object ... End Object blocks.';
+  const tree = buildSTTree(blocks);
+  if (!tree.root) return '// Could not parse State Tree structure.';
+  return formatSTOutput(tree, opts);
+}
+
+function formatSTOutput(tree, opts) {
+  const lines = [];
+  lines.push('# ' + (tree.treeName || 'State Tree'));
+  lines.push('');
+  formatSTState(tree.root, lines, '', '', opts);
+  if (opts.showBindings && tree.bindings.length) {
+    lines.push('');
+    lines.push('## Bindings (' + tree.bindings.length + ')');
+    for (const b of tree.bindings) lines.push('  ' + b.source + ' → ' + b.target);
+  }
+  return lines.join('\n');
+}
+
+function formatSTState(state, lines, prefix, childPrefix, opts) {
+  let line = state.name || '(unnamed)';
+
+  if (state.selectionBehavior) {
+    line += ' [select: ' + state.selectionBehavior
+      .replace('TrySelectChildrenAtRandomWeightedByUtility', 'WeightedRandom')
+      .replace('TrySelectChildrenInOrder', 'InOrder') + ']';
+  }
+  if (state.requiredEvent) line += ' [on: ' + parseSTEventStr(state.requiredEvent) + ']';
+
+  const taskDescs = state.tasks.map(t => fmtSTTask(t, state.instanceObjects)).filter(Boolean);
+  if (taskDescs.length) line += ' {' + taskDescs.join(', ') + '}';
+
+  const consDescs = state.considerations.map(fmtSTConsideration);
+  if (consDescs.length) line += ' [utility: ' + consDescs.join(', ') + ']';
+
+  const condDescs = state.enterConditions.map(fmtSTCondition);
+  if (condDescs.length) line += ' [if: ' + condDescs.join(' & ') + ']';
+
+  lines.push(prefix + line);
+
+  for (const t of state.transitions) lines.push(childPrefix + '  ' + fmtSTTransition(t));
+
+  for (let i = 0; i < state.children.length; i++) {
+    const last = i === state.children.length - 1;
+    formatSTState(state.children[i], lines,
+      childPrefix + (last ? '└─ ' : '├─ '),
+      childPrefix + (last ? '   ' : '│  '), opts);
+  }
+}
+
 // ===== UI wiring: Blueprint tab =====
 
 const inputEl = document.getElementById('input');
@@ -1312,6 +1629,12 @@ document.getElementById('optimizeBtn').addEventListener('click', () => {
   // running it through the Blueprint parser (which would warn on every chooser block).
   if (/Begin\s+Object\s+Class=\/Script\/Chooser\.ChooserTable\b/.test(inputEl.value)) {
     outputEl.value = '// This looks like a Chooser Table.\n// Switch to the "Chooser Table" tab to optimize it.';
+    renderLog();
+    updateStats();
+    return;
+  }
+  if (isStateTreeInput(inputEl.value)) {
+    outputEl.value = '// This looks like a State Tree.\n// Switch to the "State Tree" tab to optimize it.';
     renderLog();
     updateStats();
     return;
@@ -1405,6 +1728,74 @@ document.getElementById('ctblLoadExample').addEventListener('click', () => {
   ctblInputEl.value = CHOOSER_EXAMPLE_TEXT;
   updateChooserStats();
   document.getElementById('ctblOptimizeBtn').click();
+});
+
+// ===== UI wiring: State Tree tab =====
+
+const stInputEl = document.getElementById('stInput');
+const stOutputEl = document.getElementById('stOutput');
+const stInStat = document.getElementById('stInStat');
+const stOutStat = document.getElementById('stOutStat');
+
+function updateSTStats() {
+  const inLen = stInputEl.value.length;
+  const outLen = stOutputEl.value.length;
+  stInStat.textContent = `${inLen.toLocaleString()} chars`;
+  if (outLen > 0 && inLen > 0) {
+    const pct = ((1 - outLen / inLen) * 100).toFixed(1);
+    stOutStat.textContent = `${outLen.toLocaleString()} chars  (-${pct}%)`;
+    stOutStat.classList.toggle('warn', pct < 30);
+  } else {
+    stOutStat.textContent = '—';
+  }
+}
+
+stInputEl.addEventListener('input', updateSTStats);
+
+document.getElementById('stOptimizeBtn').addEventListener('click', () => {
+  const opts = {
+    showBindings: document.getElementById('stShowBindings').checked,
+  };
+  clearWarnings();
+  if (/Begin\s+Object\s+Class=\/Script\/Chooser\.ChooserTable\b/.test(stInputEl.value)) {
+    stOutputEl.value = '// This looks like a Chooser Table.\n// Switch to the "Chooser Table" tab to optimize it.';
+    renderLog();
+    updateSTStats();
+    return;
+  }
+  if (!isStateTreeInput(stInputEl.value) && /Begin\s+Object\s+Class=\/Script\/BlueprintGraph\./.test(stInputEl.value)) {
+    stOutputEl.value = '// This looks like a Blueprint.\n// Switch to the "Blueprint" tab to optimize it.';
+    renderLog();
+    updateSTStats();
+    return;
+  }
+  try {
+    stOutputEl.value = optimizeStateTree(stInputEl.value, opts);
+  } catch (e) {
+    stOutputEl.value = '// Error: ' + e.message;
+    logWarning('exception', 'State Tree parser/optimizer threw an error', e.message);
+  }
+  renderLog();
+  updateSTStats();
+});
+
+document.getElementById('stClearBtn').addEventListener('click', () => {
+  stInputEl.value = '';
+  stOutputEl.value = '';
+  clearWarnings();
+  renderLog();
+  updateSTStats();
+});
+
+document.getElementById('stCopyBtn').addEventListener('click', () => {
+  stOutputEl.select();
+  document.execCommand('copy');
+});
+
+document.getElementById('stLoadExample').addEventListener('click', () => {
+  stInputEl.value = ST_EXAMPLE_TEXT;
+  updateSTStats();
+  document.getElementById('stOptimizeBtn').click();
 });
 
 // ===== Tab switching =====
@@ -1517,8 +1908,99 @@ const CHOOSER_EXAMPLE_TEXT = `Begin Object Class=/Script/Chooser.ChooserTable Na
    ContextData(1)=/Script/Chooser.ContextObjectTypeStruct(Struct="/Script/CoreUObject.ScriptStruct'/Script/CharacterCustomizer.ChooserOutputs'",Direction=Write)
 End Object`;
 
+const ST_EXAMPLE_TEXT = `Begin Object Class=/Script/StateTreeEditorModule.StateTreeState Name="StateTreeState_0" ExportPath="/Script/StateTreeEditorModule.StateTreeState'/Game/System/Combat/ST_Combat.ST_Combat:StateTreeEditorData_0.StateTreeState_0'"
+   Begin Object Name="StateTreeState_0" ExportPath="/Script/StateTreeEditorModule.StateTreeState'/Game/System/Combat/ST_Combat.ST_Combat:StateTreeEditorData_0.StateTreeState_0.StateTreeState_0'"
+      Name="Flee"
+      ColorRef=(ID=36EA32304D100D2F3A771081D1AD4E8E)
+      Parameters=(ID=38A23092418BB23B715D6F88DDF3C018)
+      ID=60BCC2C54F41B117DB9C509C2A76E17B
+      Parent="/Script/StateTreeEditorModule.StateTreeState'StateTreeState_0'"
+   End Object
+   Begin Object Name="StateTreeState_1" ExportPath="/Script/StateTreeEditorModule.StateTreeState'/Game/System/Combat/ST_Combat.ST_Combat:StateTreeEditorData_0.StateTreeState_0.StateTreeState_1'"
+      Begin Object Name="StateTreeState_3" ExportPath="/Script/StateTreeEditorModule.StateTreeState'/Game/System/Combat/ST_Combat.ST_Combat:StateTreeEditorData_0.StateTreeState_0.StateTreeState_1.StateTreeState_3'"
+         Begin Object Name="StateTreeState_2" ExportPath="/Script/StateTreeEditorModule.StateTreeState'/Game/System/Combat/ST_Combat.ST_Combat:StateTreeEditorData_0.StateTreeState_0.StateTreeState_1.StateTreeState_3.StateTreeState_2'"
+            Name="Wait"
+            ColorRef=(ID=B404BC89442DFF80691B5D9E720E34B9)
+            Parameters=(ID=A96A5DAF4B12C473B03A0DAD1847CD1E)
+            Tasks(0)=(Node=/Script/StateTreeModule.StateTreeDelayTask(bTaskEnabled=True,TransitionHandlingPriority=Normal,bConsideredForCompletion=True,bCanEditConsideredForCompletion=True,Name="",BindingsBatch=(Value=65535),OutputBindingsBatch=(Value=65535),InstanceTemplateIndex=(Value=65535),ExecutionRuntimeTemplateIndex=(Value=65535),InstanceDataHandle=(Source=None,Index=65535,StateHandle=(Index=65535))),Instance=/Script/StateTreeModule.StateTreeDelayTaskInstanceData(Duration=3.000000,RandomDeviation=1.000000,bRunForever=False),ID=C89B234441FBFA6F18D559ACC2855267)
+            Transitions(0)=(State=(Name="Idle",ID=F730226D457CEE7BCACCF1A1CB9E98E8,LinkType=GotoState),ID=48C42F10434FBD5844736E8B2EB92DE6,bTransitionEnabled=False)
+            ID=B9FFBD2A4C9F6E59FD713091945545C1
+            Parent="/Script/StateTreeEditorModule.StateTreeState'StateTreeState_0.StateTreeState_1.StateTreeState_3'"
+         End Object
+         Begin Object Name="StateTreeState_1" ExportPath="/Script/StateTreeEditorModule.StateTreeState'/Game/System/Combat/ST_Combat.ST_Combat:StateTreeEditorData_0.StateTreeState_0.StateTreeState_1.StateTreeState_3.StateTreeState_1'"
+            Begin Object Name="STT_MoveToRandomLOCation_C_0" ExportPath="/Game/System/Combat/STT_MoveToRandomLocation.STT_MoveToRandomLocation_C'/Game/System/Combat/ST_Combat.ST_Combat:StateTreeEditorData_0.StateTreeState_0.StateTreeState_1.StateTreeState_3.StateTreeState_1.STT_MoveToRandomLOCation_C_0'"
+               Radius=1000.000000
+            End Object
+            Name="Idle"
+            ColorRef=(ID=B404BC89442DFF80691B5D9E720E34B9)
+            Parameters=(ID=5EE7C5DF4C7CA0C9F8D0F3B05399460B)
+            Tasks(0)=(Node=/Script/StateTreeModule.StateTreeBlueprintTaskWrapper(TaskClass="/Script/Engine.BlueprintGeneratedClass'/Game/System/Combat/STT_MoveToRandomLocation.STT_MoveToRandomLocation_C'",TaskFlags=0,bTaskEnabled=True,TransitionHandlingPriority=Normal,bConsideredForCompletion=True,bCanEditConsideredForCompletion=True,Name="",BindingsBatch=(Value=65535),OutputBindingsBatch=(Value=65535),InstanceTemplateIndex=(Value=65535),ExecutionRuntimeTemplateIndex=(Value=65535),InstanceDataHandle=(Source=None,Index=65535,StateHandle=(Index=65535))),InstanceObject="/Game/System/Combat/STT_MoveToRandomLocation.STT_MoveToRandomLocation_C'STT_MoveToRandomLOCation_C_0'",ID=AADEAF624994241C5B244C8EFDBF53CD)
+            Tasks(1)=()
+            Transitions(0)=(State=(Name="Root",LinkType=NextSelectableState),ID=4183FF444021268CF232908382FD9B9C)
+            ID=F730226D457CEE7BCACCF1A1CB9E98E8
+            Parent="/Script/StateTreeEditorModule.StateTreeState'StateTreeState_0.StateTreeState_1.StateTreeState_3'"
+         End Object
+         Begin Object Name="StateTreeState_0" ExportPath="/Script/StateTreeEditorModule.StateTreeState'/Game/System/Combat/ST_Combat.ST_Combat:StateTreeEditorData_0.StateTreeState_0.StateTreeState_1.StateTreeState_3.StateTreeState_0'"
+            Name="RunScedule"
+            ColorRef=(ID=B404BC89442DFF80691B5D9E720E34B9)
+            Parameters=(ID=4CC275AE4C91304416B2DAA1948E4963)
+            EnterConditions(0)=(Node=/Script/StateTreeModule.StateTreeCompareBoolCondition(bInvert=False,Operand=And,DeltaIndent=0,EvaluationMode=Evaluated,Name="",BindingsBatch=(Value=65535),OutputBindingsBatch=(Value=65535),InstanceTemplateIndex=(Value=65535),ExecutionRuntimeTemplateIndex=(Value=65535),InstanceDataHandle=(Source=None,Index=65535,StateHandle=(Index=65535))),Instance=/Script/StateTreeModule.StateTreeCompareBoolConditionInstanceData(bLeft=False,bRight=True),ID=171E7FE3460F0933EC38A4B3885D0A7F)
+            Transitions(0)=(State=(Name="Root",ID=C9F6DBBB44582F67586122B27500D9B0,LinkType=GotoState),ID=2B513D374F4B79C13F38299DAF1E2861)
+            ID=FD798E4E4079E22E40F3058563F18254
+            Parent="/Script/StateTreeEditorModule.StateTreeState'StateTreeState_0.StateTreeState_1.StateTreeState_3'"
+         End Object
+         Name="Scedule"
+         ColorRef=(ID=B404BC89442DFF80691B5D9E720E34B9)
+         Parameters=(ID=61CEF9DC4CF89742EAF45F86D408B858)
+         Children(0)="/Script/StateTreeEditorModule.StateTreeState'StateTreeState_0'"
+         Children(1)="/Script/StateTreeEditorModule.StateTreeState'StateTreeState_1'"
+         Children(2)="/Script/StateTreeEditorModule.StateTreeState'StateTreeState_2'"
+         ID=7CB09E6F42F6AB8B835F94A37B653D97
+         Parent="/Script/StateTreeEditorModule.StateTreeState'StateTreeState_0.StateTreeState_1'"
+      End Object
+      Begin Object Name="StateTreeState_4" ExportPath="/Script/StateTreeEditorModule.StateTreeState'/Game/System/Combat/ST_Combat.ST_Combat:StateTreeEditorData_0.StateTreeState_0.StateTreeState_1.StateTreeState_4'"
+         Begin Object Name="ST_DIalogueTask_C_0" ExportPath="/Game/System/Combat/ST_DIalogueTask.ST_DIalogueTask_C'/Game/System/Combat/ST_Combat.ST_Combat:StateTreeEditorData_0.StateTreeState_0.StateTreeState_1.StateTreeState_4.ST_DIalogueTask_C_0'"
+         End Object
+         Name="Dialogue"
+         ColorRef=(ID=B404BC89442DFF80691B5D9E720E34B9)
+         Parameters=(ID=EC5EF917476494BAF9603CA8A32C485B)
+         bHasRequiredEventToEnter=True
+         RequiredEventToEnter=(Tag=(TagName="StateTree.DialogueTriggered"),PayloadStruct="/Script/CoreUObject.UserDefinedStruct'/Game/System/Dialogue/Structs/S_DialoguePayload.S_DialoguePayload'")
+         Tasks(0)=(Node=/Script/StateTreeModule.StateTreeBlueprintTaskWrapper(TaskClass="/Script/Engine.BlueprintGeneratedClass'/Game/System/Combat/ST_DIalogueTask.ST_DIalogueTask_C'",TaskFlags=0,bTaskEnabled=True,TransitionHandlingPriority=Normal,bConsideredForCompletion=True,bCanEditConsideredForCompletion=True,Name="",BindingsBatch=(Value=65535),OutputBindingsBatch=(Value=65535),InstanceTemplateIndex=(Value=65535),ExecutionRuntimeTemplateIndex=(Value=65535),InstanceDataHandle=(Source=None,Index=65535,StateHandle=(Index=65535))),InstanceObject="/Game/System/Combat/ST_DIalogueTask.ST_DIalogueTask_C'ST_DIalogueTask_C_0'",ID=CD179AFE440F75B31D5CCBAB836FDA2E)
+         SingleTask=(ID=74B37D8C45DE4E181CE493AF54329DED)
+         ID=88BC574249F118172BBAE99562CD67E8
+         Parent="/Script/StateTreeEditorModule.StateTreeState'StateTreeState_0.StateTreeState_1'"
+      End Object
+      Name="Neutral"
+      ColorRef=(ID=B404BC89442DFF80691B5D9E720E34B9)
+      Parameters=(ID=E0A3912D4D7778FBB42437A80E082F1D)
+      SingleTask=(ID=B10BC6E34A7AA1C91C2108B8AD65A31E)
+      Transitions(0)=(Trigger=OnEvent,RequiredEvent=(Tag=(TagName="StateTree.DialogueTriggered"),PayloadStruct="/Script/CoreUObject.UserDefinedStruct'/Game/System/Dialogue/Structs/S_DialoguePayload.S_DialoguePayload'"),State=(Name="Dialogue",ID=88BC574249F118172BBAE99562CD67E8,LinkType=GotoState),ID=1C8C0E0049F12998D63CAFB876ECDCDF)
+      Children(0)="/Script/StateTreeEditorModule.StateTreeState'StateTreeState_3'"
+      Children(1)="/Script/StateTreeEditorModule.StateTreeState'StateTreeState_4'"
+      ID=722875DE4C51E4B8CE901D93B8B4E99B
+      Parent="/Script/StateTreeEditorModule.StateTreeState'StateTreeState_0'"
+   End Object
+   Name="Root"
+   ColorRef=(ID=E0E1EFAA479560D2AED39AB4C9913FBE)
+   Parameters=(ID=8EE1B656425E42306100AA86D0E2ECD8)
+   Transitions(0)=(Trigger=OnEvent,RequiredEvent=(Tag=(TagName="StateTree.EnemySensed.Sight")),State=(Name="Target Found",ID=D81515F54518CA56CFB679BF1454BF42,LinkType=GotoState),ID=821D37034674A3FCC0D2D98CC006490F)
+   Transitions(1)=(Trigger=OnEvent,RequiredEvent=(Tag=(TagName="StateTree.SearchLastSeenLocation")),State=(Name="CheckLastLocation",ID=84141FE2464907AA79BAD083CDBA6E97,LinkType=GotoState),ID=E3131A4B489865E6C5E0E69D78C06895)
+   Transitions(2)=(Trigger=OnEvent,RequiredEvent=(Tag=(TagName="StateTree.EnemySensed.Wait")),State=(Name="Recognize",ID=3755F2C34E1700B3415E36B1009434B6,LinkType=GotoState),ID=35A883D14EB9B8AC48DCF5978B8AFC09)
+   Children(0)="/Script/StateTreeEditorModule.StateTreeState'StateTreeState_1'"
+   Children(1)="/Script/StateTreeEditorModule.StateTreeState'StateTreeState_5'"
+   Children(2)="/Script/StateTreeEditorModule.StateTreeState'StateTreeState_0'"
+   ID=C9F6DBBB44582F67586122B27500D9B0
+End Object
+Begin Object Class=/Script/StateTreeEditorModule.StateTreeClipboardBindings Name="StateTreeClipboardBindings_0" ExportPath="/Script/StateTreeEditorModule.StateTreeClipboardBindings'/Engine/Transient.StateTreeClipboardBindings_0'"
+   Bindings(0)=(SourcePropertyPath=(StructID=75AB20ED4C9A4FF93D49D9926F943CF4,Segments=((Name="DebugScedule"))),TargetPropertyPath=(StructID=171E7FE3460F0933EC38A4B3885D0A7F,Segments=((Name="bLeft"))))
+   Bindings(1)=(SourcePropertyPath=(StructID=FF6B96D213DC0A055415B48F78ED89AC,Segments=((Name="Payload",InstanceStruct="/Script/CoreUObject.UserDefinedStruct'/Game/System/Dialogue/Structs/S_DialoguePayload.S_DialoguePayload'",InstancedStructAccessType=StructInstance),(Name="DialogueComponent_2_54A27E5B4F2B2831CDCB46A6EC3B4497"))),TargetPropertyPath=(StructID=CD179AFE440F75B31D5CCBAB836FDA2E,Segments=((Name="DialogueComponent"))))
+   Bindings(2)=(SourcePropertyPath=(StructID=75AB20ED4C9A4FF93D49D9926F943CF4,Segments=((Name="ChangeAttack"))),TargetPropertyPath=(StructID=E6DE98C94167FF50E686889CA4E66F46,Segments=((Name="bLeft"))))
+End Object`;
+
 updateStats();
 updateChooserStats();
+updateSTStats();
 </script>
 
 </body>
